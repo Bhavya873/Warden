@@ -1,51 +1,45 @@
-/* Warden — a warehouse-floor console, not a generic SaaS dashboard: warm concrete/steel
-   neutrals instead of the near-black-plus-blue "tech" default, and an accent palette
-   pulled from real warehouse/AGV safety signage rather than a brand color. Warden (the
-   thing being demoed) gets hazard-tape amber — the one color on the page meant to catch
-   your eye, the same way hazard tape does on a real floor. Baseline recedes into a plain
-   steel gray, since it's the unremarkable "before" case. Move-outcome colors are the
-   OSHA-standard signal set (green/amber/red) plus AGV rotating-beacon blue for near-miss
-   — a real fourth safety-light color, not an arbitrary purple. */
+/* Warden — dark fleet-operations console, built on a shadcn-style token system
+   (background/foreground/card/border/primary/secondary/muted/destructive/ring) so every
+   surface on the page — the floor canvases, the control groups, the stat tiles, the
+   chart panels — uses the exact same component recipe instead of one-off styling.
+   Saturated color is reserved for the move-outcome legend (green/amber/red/violet);
+   everything else stays on the neutral scale so status reads unambiguously against it. */
 
 :root {
-  --background: #1a1816;
-  --foreground: #f2ede4;
+  --background: #0a0d13;
+  --foreground: #eef1f6;
 
-  --card: #262220;
-  --card-foreground: #f2ede4;
+  --card: #12161f;
+  --card-foreground: #eef1f6;
 
-  --border: #3a332c;
-  --input: #3a332c;
-  --ring: #e8a23c;
+  --border: #232838;
+  --input: #232838;
+  --ring: #5b8cff;
 
-  --primary: #e8a23c;
-  --primary-hover: #f5b457;
-  --primary-foreground: #1a1816;
+  --primary: #5b8cff;
+  --primary-hover: #4877e6;
+  --primary-foreground: #0a0d13;
 
-  --secondary: #34302b;
-  --secondary-foreground: #f2ede4;
+  --secondary: #1a2030;
+  --secondary-foreground: #eef1f6;
 
-  --muted: #211d1a;
-  --muted-foreground: #a89e8f;
+  --muted: #171c28;
+  --muted-foreground: #8892a3;
 
-  --destructive: #d64545;
-  --destructive-foreground: #f2ede4;
+  --destructive: #f87171;
+  --destructive-foreground: #0a0d13;
 
-  --accent-naive: #8792a3;
+  --accent-naive: #e8935c;
 
-  --status-moved: #4fae62;
-  --status-waiting: #f5c518;
-  --status-conflict: #d64545;
-  --status-near-miss: #2f86d6;
+  --status-moved: #34d399;
+  --status-waiting: #fbbf24;
+  --status-conflict: #f87171;
+  --status-near-miss: #c084fc;
 
   --radius: 0.5rem;
 
-  /* Barlow: designed for signage/dashboard legibility (DMV/highway-sign lineage) — reads
-     as floor-plan/instrument-panel type, not a generic app typeface. JetBrains Mono for
-     every live number: this is a telemetry readout, so a monospace face is earned here,
-     not decoration. */
-  --font-sans: "Barlow", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 * {
@@ -187,7 +181,7 @@ body {
 
 .live-dot.connected {
   background: var(--status-moved);
-  box-shadow: 0 0 0 3px rgba(79, 174, 98, 0.18);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.18);
   animation: pulse 2.2s ease-in-out infinite;
 }
 
@@ -277,7 +271,7 @@ body {
 
 .dot-warden {
   background: var(--primary);
-  box-shadow: 0 0 8px rgba(232, 162, 60, 0.6);
+  box-shadow: 0 0 8px rgba(91, 140, 255, 0.6);
 }
 
 /* --- Legend ------------------------------------------------------------- */

@@ -111,32 +111,62 @@
   </main>
 
   <section class="dashboard">
-    <div class="totals-split">
-      <div class="panel totals-column">
-        <h2 class="panel-title"><span class="dot dot-naive"></span>Baseline</h2>
-        <dl class="totals">
-          <div class="total"><dt>Moves</dt><dd class="mono" id="split-naive-total-moves">0</dd></div>
-          <div class="total"><dt title="A move that needed a round trip to the server before it could proceed">Server checks</dt><dd class="mono" id="split-naive-total-confirmed">0</dd></div>
-          <div class="total"><dt title="The server found a real conflict and blocked the move">Conflicts caught</dt><dd class="mono" id="split-naive-total-conflicts">0</dd></div>
-          <div class="total total-near-miss"><dt title="The local filter said free and was wrong — the server's final check caught the mistake before it became a real collision">Near-misses</dt><dd class="mono" id="split-naive-total-near-misses">0</dd></div>
-        </dl>
-      </div>
-      <div class="panel totals-column">
-        <h2 class="panel-title"><span class="dot dot-warden"></span>Warden</h2>
-        <dl class="totals">
-          <div class="total"><dt>Moves</dt><dd class="mono" id="split-warden-total-moves">0</dd></div>
-          <div class="total"><dt title="A move that needed a round trip to the server before it could proceed">Server checks</dt><dd class="mono" id="split-warden-total-confirmed">0</dd></div>
-          <div class="total"><dt title="The server found a real conflict and blocked the move">Conflicts caught</dt><dd class="mono" id="split-warden-total-conflicts">0</dd></div>
-          <div class="total total-near-miss"><dt title="The local filter said free and was wrong — the server's final check caught the mistake before it became a real collision">Near-misses</dt><dd class="mono" id="split-warden-total-near-misses">0</dd></div>
-        </dl>
-      </div>
-    </div>
-
-    <div class="charts">
-      <div class="panel chart-box">
-        <canvas id="mix-chart"></canvas>
-      </div>
-      <div class="panel chart-box">
+    <div class="panel">
+      <h2 class="panel-title">Baseline vs. Warden</h2>
+      <table class="compare">
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col"><span class="dot dot-naive"></span>Baseline</th>
+            <th scope="col"><span class="dot dot-warden"></span>Warden</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row" title="Total moves completed so far">Moves</th>
+            <td class="mono" id="cmp-naive-moves">0</td>
+            <td class="mono" id="cmp-warden-moves">0</td>
+          </tr>
+          <tr>
+            <th
+              scope="row"
+              title="Share of moves that needed a network round trip to the server, instead of being decided instantly on-device by the local filter"
+            >
+              Requests to server
+            </th>
+            <td>
+              <span class="mono request-pct" id="cmp-naive-requests-pct">0%</span>
+              <div class="request-bar"><div class="request-bar-fill" id="cmp-naive-requests-fill"></div></div>
+            </td>
+            <td>
+              <span class="mono request-pct" id="cmp-warden-requests-pct">0%</span>
+              <div class="request-bar"><div class="request-bar-fill" id="cmp-warden-requests-fill"></div></div>
+            </td>
+          </tr>
+          <tr>
+            <th
+              scope="row"
+              title="Requests currently waiting on the coordinator — this single-process demo shares one CPU between both boards, so queue depth (not a CPU percentage) is the honest stand-in for server load here"
+            >
+              Server load
+            </th>
+            <td class="mono" id="cmp-naive-load">0</td>
+            <td class="mono" id="cmp-warden-load">0</td>
+          </tr>
+          <tr>
+            <th
+              scope="row"
+              title="Real collisions never happen — the grid guarantees it structurally. This counts moves the server blocked because two robots wanted the same cell."
+            >
+              Conflicts prevented
+            </th>
+            <td class="mono" id="cmp-naive-conflicts">0</td>
+            <td class="mono" id="cmp-warden-conflicts">0</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="sparkline-label">Server load over time</p>
+      <div class="sparkline-wrap">
         <canvas id="load-chart"></canvas>
       </div>
     </div>

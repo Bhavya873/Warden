@@ -417,54 +417,88 @@ input[type="range"]:focus-visible {
 }
 
 /* --- Dashboard ------------------------------------------------------------ */
+/* One panel: a scannable comparison table (the point-in-time numbers) plus a single
+   unobtrusive trend sparkline — not a wall of separate stat tiles and full charts. */
 
 .dashboard {
   margin-top: 48px;
 }
 
-.totals-split {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-  margin-bottom: 24px;
+.compare {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-.totals-column {
-  flex: 1 1 280px;
+.compare th,
+.compare td {
+  padding: 12px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
 }
 
-.totals {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px 24px;
-  margin: 0;
-  padding: 0;
-}
-
-.total dt {
-  font-size: 0.75rem;
+.compare thead th {
+  padding-top: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
   color: var(--muted-foreground);
-  margin: 0 0 4px;
 }
 
-.total dd {
-  margin: 0;
-  font-size: 1.5rem;
+.compare thead th:first-child {
+  text-align: left;
+}
+
+.compare thead .dot {
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.compare tbody th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  cursor: help; /* every row label carries a title= explainer */
+}
+
+.compare tbody td {
+  font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: -0.01em;
+  width: 140px;
 }
 
-.total-near-miss dd {
-  color: var(--status-near-miss);
+.compare tbody tr:last-child th,
+.compare tbody tr:last-child td {
+  border-bottom: none;
 }
 
-.charts {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
+.request-pct {
+  display: block;
+  font-size: 1.25rem;
 }
 
-.chart-box {
-  flex: 1 1 380px;
-  height: 280px;
+.request-bar {
+  margin-top: 6px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.request-bar-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 999px;
+  transition: width 200ms ease;
+}
+
+.sparkline-label {
+  margin: 20px 0 8px;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.sparkline-wrap {
+  position: relative;
+  height: 64px;
 }

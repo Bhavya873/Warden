@@ -13,7 +13,7 @@ Flat checklist view of `tasks/plan.md`, in dependency order. Parallel pairs note
 - [ ] **Task W1** — Naive-mode dashboard wiring *(parallel, needs Task 4)*
 - [ ] **Checkpoint 3** — lock logging/metrics schema (after Task 4)
 - [x] **Task 5** — Warden mode end-to-end (Phase 3 core)
-- [ ] **Task 6** — Adversarial staleness test + documented finding (Phase 3 amendment)
+- [x] **Task 6** — Adversarial staleness test + documented finding (Phase 3 amendment)
 - [ ] **Checkpoint 4** — review staleness finding, decide Task 11's design (after Task 6) — most important checkpoint
 - [ ] **Task 7** — Benchmark harness (Phase 4)
 - [ ] **Checkpoint 5** — sanity-check headline figures are measured, not estimated (after Task 7)

@@ -37,6 +37,12 @@ class GridWorld:
         self._rng = random.Random(seed)
         self._occupied: dict[Cell, int] = {}
         self.robots: list[Robot] = []
+        # A near-miss: `policy` approved a move (instant or confirmed) but the live
+        # occupancy check below rejected it anyway, because ground truth had already
+        # moved on by the time the move was attempted. Defined and measured in build
+        # spec §6 Phase 3 step 6's adversarial staleness test — see tests/test_staleness.py
+        # and tasks/staleness-finding.md.
+        self.near_miss_count = 0
         self._spawn_robots()
 
     def _random_free_cell(self) -> Cell:
@@ -110,6 +116,8 @@ class GridWorld:
                 continue  # waiting on the policy (e.g. an in-flight confirm-check)
             if next_cell in self._occupied:
                 robot.consecutive_blocked_ticks += 1
+                if policy is not None:
+                    self.near_miss_count += 1  # policy approved this move; ground truth didn't
                 continue  # blocked this tick — try again next tick
 
             del self._occupied[(robot.x, robot.y)]

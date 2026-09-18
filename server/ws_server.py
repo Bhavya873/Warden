@@ -2,23 +2,33 @@
 Phase 5). Drives the tick loop itself; browser clients are read-only observers plus a
 small set of live controls (mode, robot count, grid size).
 
-Message schema (server -> client), one per tick — this is the contract Tasks 9/10/11
-extend, so keep additions backward-compatible (new keys, not renamed/removed ones):
+Message schema (server -> client), one per tick — this is the contract Task 11 extends,
+so keep additions backward-compatible (new keys, not renamed/removed ones):
 
-    {"type": "tick", "tick": int, "grid_size": int, "mode": "naive" | "warden",
-     "robot_count": int,
+Single mode ("naive" | "warden"):
+    {"type": "tick", "grid_size": int, "mode": "naive" | "warden",
+     "tick": int, "robot_count": int,
      "robots": [{"id": int, "x": int, "y": int, "dx": int, "dy": int}, ...],
      "stats": {"instant_moves": int, "confirmed_checks": int, "conflicts_avoided": int,
                "queue_depth": int, "near_miss_count_total": int},
      "totals": {"instant_moves": int, "confirmed_checks": int, "conflicts_avoided": int}}
      (instant_moves is always 0 in naive mode — every move is a confirmed check there.
      "totals" are cumulative since the current mode was selected — a mode switch resets
-     them, since it's a fresh coordinator; a robot-count/grid-size change does not,
-     except grid-size also resets the world itself, per set_grid_size below.)
+     them, since it's a fresh coordinator; a robot-count change does not.)
+
+Split mode — two independent worlds, same seed, run in lockstep, each mirroring the
+single-mode "board" shape above (tick/robot_count/robots/stats/totals) under its label:
+    {"type": "tick_split", "grid_size": int, "mode": "split",
+     "boards": {"naive": {<board>}, "warden": {<board>}}}
+
+Entering split mode always starts a *fresh* pair of worlds (same seed on both sides) —
+it's a deliberate side-by-side comparison, not a continuation of whatever the single-mode
+world was doing. Leaving split mode resumes the single-mode world exactly where it was
+frozen while split was active (build spec §6 Phase 5 step 4).
 
 Control messages (client -> server), one JSON object per WS text frame:
 
-    {"action": "set_mode", "mode": "naive" | "warden"}
+    {"action": "set_mode", "mode": "naive" | "warden" | "split"}
     {"action": "set_robot_count", "count": int}
     {"action": "set_grid_size", "size": int}
 """
@@ -49,32 +59,70 @@ DEFAULT_SEED = 1
 RING_BUFFER_CAPACITY = MAX_ROBOT_COUNT * CAPACITY_MULTIPLIER
 
 
+def _zero_totals() -> dict:
+    return {"instant_moves": 0, "confirmed_checks": 0, "conflicts_avoided": 0}
+
+
 class SimulationServer:
     def __init__(self) -> None:
         self.grid_size = DEFAULT_GRID_SIZE
-        self.mode = "warden"
+        self.mode = "warden"  # "naive" | "warden" | "split"
         self.clients: set = set()
-        self.sim = self._new_simulator()
-        self.totals = {"instant_moves": 0, "confirmed_checks": 0, "conflicts_avoided": 0}
 
-    def _new_simulator(self) -> Simulator:
+        self.sim = self._new_single_simulator()
+        self.totals = _zero_totals()
+
+        self.split_sims: dict[str, Simulator] | None = None
+        self.split_totals: dict[str, dict] | None = None
+
+    def _new_single_simulator(self) -> Simulator:
         return Simulator(
             grid_size=self.grid_size,
             robot_count=DEFAULT_ROBOT_COUNT,
             seed=DEFAULT_SEED,
             naive_mode=(self.mode == "naive"),
-            warden_mode=(self.mode == "warden"),
+            warden_mode=(self.mode != "naive"),  # covers "warden" and the initial "split"-free default
             ring_buffer_capacity=RING_BUFFER_CAPACITY,
         )
 
+    def _new_split_simulators(self, robot_count: int) -> dict[str, Simulator]:
+        """Two worlds, identical seed — visually identical until coordination-driven
+        divergence (build spec §6 Phase 5 step 4)."""
+        return {
+            "naive": Simulator(
+                grid_size=self.grid_size,
+                robot_count=robot_count,
+                seed=DEFAULT_SEED,
+                naive_mode=True,
+                ring_buffer_capacity=RING_BUFFER_CAPACITY,
+            ),
+            "warden": Simulator(
+                grid_size=self.grid_size,
+                robot_count=robot_count,
+                seed=DEFAULT_SEED,
+                warden_mode=True,
+                ring_buffer_capacity=RING_BUFFER_CAPACITY,
+            ),
+        }
+
     def set_mode(self, mode: str) -> None:
-        """Swaps only the coordinator — `self.sim.world` (robot positions, targets,
-        tick_count) is untouched, so this never causes the visible jump/reset a full
-        Simulator rebuild would (build spec §6 Phase 5 step 3)."""
-        if mode not in ("naive", "warden") or mode == self.mode:
+        """Swapping between "naive" and "warden" only swaps `self.sim`'s coordinator —
+        its world (positions, targets, tick_count) is untouched, so it never causes the
+        visible jump/reset a full rebuild would (build spec §6 Phase 5 step 3). Entering
+        or leaving "split" is a different kind of transition — see module docstring."""
+        if mode not in ("naive", "warden", "split") or mode == self.mode:
             return
         self.mode = mode
-        self.totals = {"instant_moves": 0, "confirmed_checks": 0, "conflicts_avoided": 0}
+
+        if mode == "split":
+            robot_count = len(self.sim.world.robots)
+            self.split_sims = self._new_split_simulators(robot_count)
+            self.split_totals = {"naive": _zero_totals(), "warden": _zero_totals()}
+            return
+
+        self.split_sims = None
+        self.split_totals = None
+        self.totals = _zero_totals()
         robot_count = len(self.sim.world.robots)
         if mode == "naive":
             self.sim.coordinator = Coordinator(
@@ -86,27 +134,31 @@ class SimulationServer:
             )
 
     def set_grid_size(self, size: int) -> None:
-        """Re-initializes the sim — grid size can't change under existing robots without
-        a reset (build spec §6 Phase 5 step 1)."""
+        """Re-initializes the sim(s) — grid size can't change under existing robots
+        without a reset (build spec §6 Phase 5 step 1)."""
         size = max(MIN_GRID_SIZE, min(MAX_GRID_SIZE, size))
         if size == self.grid_size:
             return
         self.grid_size = size
-        self.sim = self._new_simulator()
-        self.totals = {"instant_moves": 0, "confirmed_checks": 0, "conflicts_avoided": 0}
+        if self.mode == "split":
+            robot_count = len(self.split_sims["naive"].world.robots)
+            self.split_sims = self._new_split_simulators(robot_count)
+            self.split_totals = {"naive": _zero_totals(), "warden": _zero_totals()}
+        else:
+            self.sim = self._new_single_simulator()
+            self.totals = _zero_totals()
 
     def set_robot_count(self, count: int) -> None:
         count = max(MIN_ROBOT_COUNT, min(MAX_ROBOT_COUNT, count))
-        while len(self.sim.world.robots) < count:
-            self.sim.world.add_robot()
-        while len(self.sim.world.robots) > count:
-            self.sim.world.remove_robot()
+        worlds = [sim.world for sim in self.split_sims.values()] if self.mode == "split" else [self.sim.world]
+        for world in worlds:
+            while len(world.robots) < count:
+                world.add_robot()
+            while len(world.robots) > count:
+                world.remove_robot()
 
-    def step_and_serialize(self) -> dict:
-        before = self.sim.world.robot_positions()
-        self.sim.step()
-        world = self.sim.world
-
+    def _serialize_board(self, sim: Simulator, board_mode: str, before: dict, totals: dict) -> dict:
+        world = sim.world
         robots = [
             {
                 "id": robot.robot_id,
@@ -119,9 +171,9 @@ class SimulationServer:
         ]
 
         stats = {"instant_moves": 0, "confirmed_checks": 0, "conflicts_avoided": 0, "queue_depth": 0}
-        if self.sim.coordinator is not None:
-            entry = self.sim.coordinator.log[-1]
-            if self.mode == "naive":
+        if sim.coordinator is not None:
+            entry = sim.coordinator.log[-1]
+            if board_mode == "naive":
                 stats["confirmed_checks"] = entry["confirm_checks"]
                 stats["conflicts_avoided"] = entry["conflicts_avoided"]
                 stats["queue_depth"] = entry["queue_depth"]
@@ -129,23 +181,39 @@ class SimulationServer:
                 stats["instant_moves"] = entry["instant_moves"]
                 stats["confirmed_checks"] = entry["confirmed_checks"]
                 stats["conflicts_avoided"] = entry["conflicts_avoided"]
-                stats["queue_depth"] = self.sim.coordinator.confirm_check_log[-1]["queue_depth"]
+                stats["queue_depth"] = sim.coordinator.confirm_check_log[-1]["queue_depth"]
         stats["near_miss_count_total"] = world.near_miss_count
 
-        self.totals["instant_moves"] += stats["instant_moves"]
-        self.totals["confirmed_checks"] += stats["confirmed_checks"]
-        self.totals["conflicts_avoided"] += stats["conflicts_avoided"]
+        totals["instant_moves"] += stats["instant_moves"]
+        totals["confirmed_checks"] += stats["confirmed_checks"]
+        totals["conflicts_avoided"] += stats["conflicts_avoided"]
 
         return {
-            "type": "tick",
             "tick": world.tick_count,
-            "grid_size": self.grid_size,
-            "mode": self.mode,
             "robot_count": len(world.robots),
             "robots": robots,
             "stats": stats,
-            "totals": dict(self.totals),
+            "totals": dict(totals),
         }
+
+    def step_and_serialize(self) -> dict:
+        if self.mode == "split":
+            return self._step_and_serialize_split()
+        return self._step_and_serialize_single()
+
+    def _step_and_serialize_single(self) -> dict:
+        before = self.sim.world.robot_positions()
+        self.sim.step()
+        board = self._serialize_board(self.sim, self.mode, before, self.totals)
+        return {"type": "tick", "grid_size": self.grid_size, "mode": self.mode, **board}
+
+    def _step_and_serialize_split(self) -> dict:
+        boards = {}
+        for label, sim in self.split_sims.items():
+            before = sim.world.robot_positions()
+            sim.step()
+            boards[label] = self._serialize_board(sim, label, before, self.split_totals[label])
+        return {"type": "tick_split", "grid_size": self.grid_size, "mode": "split", "boards": boards}
 
     def handle_control_message(self, raw_message: str) -> None:
         try:

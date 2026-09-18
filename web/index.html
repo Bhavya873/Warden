@@ -8,13 +8,26 @@
 <body>
   <h1>Warden</h1>
   <div class="layout">
-    <canvas id="floor" width="600" height="600"></canvas>
+    <div class="floor-area">
+      <canvas id="floor" width="600" height="600"></canvas>
+      <div id="split-floors" class="split-floors">
+        <div class="split-floor">
+          <h3>Naive</h3>
+          <canvas id="floor-naive" width="380" height="380"></canvas>
+        </div>
+        <div class="split-floor">
+          <h3>Warden</h3>
+          <canvas id="floor-warden" width="380" height="380"></canvas>
+        </div>
+      </div>
+    </div>
     <div class="controls">
       <div class="control">
         <label for="mode">Mode</label>
         <select id="mode">
           <option value="warden">Warden</option>
           <option value="naive">Naive</option>
+          <option value="split">Split (Naive vs Warden)</option>
         </select>
       </div>
       <div class="control">
@@ -33,7 +46,7 @@
   </div>
 
   <div class="dashboard">
-    <dl class="totals">
+    <dl class="totals" id="totals-single">
       <div class="total">
         <dt>Total moves</dt>
         <dd id="total-moves">0</dd>
@@ -47,6 +60,25 @@
         <dd id="total-conflicts">0</dd>
       </div>
     </dl>
+
+    <div class="totals-split" id="totals-split">
+      <div class="totals-column">
+        <h4>Naive</h4>
+        <dl class="totals">
+          <div class="total"><dt>Moves</dt><dd id="split-naive-total-moves">0</dd></div>
+          <div class="total"><dt>Confirmed</dt><dd id="split-naive-total-confirmed">0</dd></div>
+          <div class="total"><dt>Conflicts avoided</dt><dd id="split-naive-total-conflicts">0</dd></div>
+        </dl>
+      </div>
+      <div class="totals-column">
+        <h4>Warden</h4>
+        <dl class="totals">
+          <div class="total"><dt>Moves</dt><dd id="split-warden-total-moves">0</dd></div>
+          <div class="total"><dt>Confirmed</dt><dd id="split-warden-total-confirmed">0</dd></div>
+          <div class="total"><dt>Conflicts avoided</dt><dd id="split-warden-total-conflicts">0</dd></div>
+        </dl>
+      </div>
+    </div>
 
     <div class="charts">
       <div class="chart-box">

@@ -99,6 +99,74 @@ def test_set_grid_size_reinitializes():
     assert server.sim.world.tick_count == 0  # fresh world, as documented
 
 
+def test_split_mode_shape():
+    server = SimulationServer()
+    server.set_mode("split")
+    state = server.step_and_serialize()
+
+    assert state["type"] == "tick_split"
+    assert state["mode"] == "split"
+    assert set(state["boards"]) == {"naive", "warden"}
+    for label, board in state["boards"].items():
+        assert set(board) == {"tick", "robot_count", "robots", "stats", "totals"}
+        assert len(board["robots"]) == board["robot_count"]
+        assert set(state["boards"][label]["stats"]) == {
+            "queue_depth",
+            "instant_moves",
+            "confirmed_checks",
+            "conflicts_avoided",
+            "near_miss_count_total",
+        }
+
+
+def test_split_mode_starts_identical_then_can_diverge():
+    server = SimulationServer()
+    server.set_mode("split")
+
+    naive_positions_initial = {r.robot_id: (r.x, r.y) for r in server.split_sims["naive"].world.robots}
+    warden_positions_initial = {r.robot_id: (r.x, r.y) for r in server.split_sims["warden"].world.robots}
+    naive_targets_initial = {r.robot_id: (r.target_x, r.target_y) for r in server.split_sims["naive"].world.robots}
+    warden_targets_initial = {r.robot_id: (r.target_x, r.target_y) for r in server.split_sims["warden"].world.robots}
+    # same seed, same spawn — both boards start from literally identical conditions
+    assert naive_positions_initial == warden_positions_initial
+    assert naive_targets_initial == warden_targets_initial
+
+    for _ in range(400):
+        server.step_and_serialize()
+
+    naive_positions_later = {r.robot_id: (r.x, r.y) for r in server.split_sims["naive"].world.robots}
+    warden_positions_later = {r.robot_id: (r.x, r.y) for r in server.split_sims["warden"].world.robots}
+    # different coordination strategies produce different move timing — the boards
+    # should have diverged by now, not stayed in lockstep forever
+    assert naive_positions_later != warden_positions_later
+
+
+def test_leaving_split_resumes_single_mode_world_where_it_was_frozen():
+    server = SimulationServer()
+    for _ in range(15):
+        server.step_and_serialize()
+    positions_before_split = {r.robot_id: (r.x, r.y) for r in server.sim.world.robots}
+    tick_before_split = server.sim.world.tick_count
+
+    server.set_mode("split")
+    for _ in range(50):
+        server.step_and_serialize()  # self.sim is frozen throughout this
+
+    server.set_mode("warden" if server.mode != "warden" else "naive")
+    positions_after_split = {r.robot_id: (r.x, r.y) for r in server.sim.world.robots}
+    assert positions_after_split == positions_before_split
+    assert server.sim.world.tick_count == tick_before_split
+
+
+def test_set_robot_count_applies_to_both_boards_in_split_mode():
+    server = SimulationServer()
+    server.set_mode("split")
+
+    server.set_robot_count(40)
+    assert len(server.split_sims["naive"].world.robots) == 40
+    assert len(server.split_sims["warden"].world.robots) == 40
+
+
 def test_server_end_to_end_over_real_websocket():
     async def body():
         server_state = SimulationServer()

@@ -1,11 +1,18 @@
 """WebSocket server streaming simulation state to the browser frontend (build spec §6
 Phase 5). Drives the tick loop itself; browser clients are read-only observers plus a
-small set of live controls (mode, robot count, grid size).
+small set of live controls (robot count, grid size, broadcast lag).
+
+The server starts directly in "split" mode and the shipped frontend never sends
+`set_mode` — there's exactly one view (Naive vs. Warden, side by side), not a choice
+between three. Single-board mode ("naive" | "warden") still exists as a server
+capability — `set_mode` still works, still covered by tests — for any other client
+that wants just one board; the shipped web/ frontend just isn't that client anymore.
 
 Message schema (server -> client), one per tick — this is the contract Task 11 extends,
 so keep additions backward-compatible (new keys, not renamed/removed ones):
 
-Single mode ("naive" | "warden"):
+Single-board mode ("naive" | "warden") — not used by the shipped frontend, still a
+valid server capability for any other client:
     {"type": "tick", "grid_size": int, "mode": "naive" | "warden",
      "tick": int, "robot_count": int, "broadcast_lag": "normal"|"degraded"|"adversarial",
      "robots": [{"id": int, "x": int, "y": int, "dx": int, "dy": int, "near_miss": bool,
@@ -92,7 +99,7 @@ def _zero_totals() -> dict:
 class SimulationServer:
     def __init__(self) -> None:
         self.grid_size = DEFAULT_GRID_SIZE
-        self.mode = "warden"  # "naive" | "warden" | "split"
+        self.mode = "warden"  # "naive" | "warden" | "split" — see note below on the default
         self.broadcast_lag_level = DEFAULT_BROADCAST_LAG
         self.clients: set = set()
 
@@ -101,6 +108,15 @@ class SimulationServer:
 
         self.split_sims: dict[str, Simulator] | None = None
         self.split_totals: dict[str, dict] | None = None
+
+        # The shipped frontend only ever shows the Naive-vs-Warden comparison now (no
+        # mode selector) — start there directly instead of requiring a set_mode("split")
+        # round trip after connecting. set_mode() can still switch to a single board
+        # (still exercised by tests, available to any other client); self.sim built
+        # above is what a switch back to "naive"/"warden" resumes.
+        self.mode = "split"
+        self.split_sims = self._new_split_simulators(DEFAULT_ROBOT_COUNT)
+        self.split_totals = {"naive": _zero_totals(), "warden": _zero_totals()}
 
     def _apply_broadcast_lag(self, sim: Simulator) -> None:
         """No-op for naive mode's Coordinator — the broadcast-lag control only means

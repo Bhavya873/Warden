@@ -30,7 +30,7 @@ RANDOM_ESCAPE_THRESHOLD_TICKS = 15
 # reason the midpoint of two uniform random points concentrates toward the center of a
 # region rather than spreading evenly). Keeping trips local weakens that bias while
 # robots still cover the whole grid over many hops (a bounded-step random walk).
-TARGET_LOCALITY_DIVISOR = 3
+TARGET_LOCALITY_DIVISOR = 5
 
 
 class CollisionError(RuntimeError):

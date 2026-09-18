@@ -8,7 +8,11 @@ from server.ws_server import MAX_ROBOT_COUNT, SimulationServer
 
 
 def test_step_and_serialize_shape():
+    # Single-board mode is no longer the server's default (the shipped frontend only
+    # ever shows split view) but it's still a valid server capability — verify its
+    # message shape by asking for it explicitly.
     server = SimulationServer()
+    server.set_mode("warden")
     state = server.step_and_serialize()
 
     assert state["type"] == "tick"
@@ -79,6 +83,7 @@ def test_set_mode_preserves_robot_positions_and_tick_count():
 
 def test_totals_accumulate_and_reset_on_mode_switch():
     server = SimulationServer()
+    server.set_mode("warden")
     for _ in range(20):
         state = server.step_and_serialize()
     assert state["totals"]["instant_moves"] + state["totals"]["confirmed_checks"] > 0
@@ -99,6 +104,7 @@ def test_totals_accumulate_and_reset_on_mode_switch():
 
 def test_set_robot_count_add_and_remove():
     server = SimulationServer()
+    server.set_mode("warden")
     original_positions = {r.robot_id: (r.x, r.y) for r in server.sim.world.robots}
 
     server.set_robot_count(35)
@@ -117,6 +123,7 @@ def test_set_robot_count_add_and_remove():
 
 def test_set_grid_size_reinitializes():
     server = SimulationServer()
+    server.set_mode("warden")
     server.step_and_serialize()
 
     server.set_grid_size(15)
@@ -131,6 +138,7 @@ def test_set_robot_count_past_grid_capacity_does_not_hang():
     # add_robot() looped forever looking for a free cell that no longer existed. A
     # test that completes at all is the proof this no longer hangs.
     server = SimulationServer()
+    server.set_mode("warden")
     server.set_grid_size(10)
     server.set_robot_count(MAX_ROBOT_COUNT)  # 150 requested, only 100 cells exist
 
@@ -197,8 +205,9 @@ def test_split_mode_starts_identical_then_can_diverge():
 
 def test_leaving_split_resumes_single_mode_world_where_it_was_frozen():
     server = SimulationServer()
-    for _ in range(15):
-        server.step_and_serialize()
+    server.set_mode("warden")  # exercise a single-mode world actually advancing first —
+    for _ in range(15):  # the server defaults to split, so without this the "before"
+        server.step_and_serialize()  # snapshot below would trivially be the frozen spawn state
     positions_before_split = {r.robot_id: (r.x, r.y) for r in server.sim.world.robots}
     tick_before_split = server.sim.world.tick_count
 
@@ -222,7 +231,8 @@ def test_set_robot_count_applies_to_both_boards_in_split_mode():
 
 
 def test_set_broadcast_lag_is_live_and_has_no_effect_in_naive_mode():
-    server = SimulationServer()  # starts in warden mode
+    server = SimulationServer()
+    server.set_mode("warden")
     assert isinstance(server.sim.coordinator.filter_refresh_interval_ticks, int)
     default_interval = server.sim.coordinator.filter_refresh_interval_ticks
 
@@ -255,6 +265,7 @@ def test_near_miss_rate_rises_with_broadcast_lag():
     # near-miss frequency should rise as broadcast lag worsens, not stay flat or drop.
     def near_miss_rate(level: str) -> float:
         server = SimulationServer()
+        server.set_mode("warden")
         server.set_robot_count(50)
         server.set_broadcast_lag(level)
         total_attempts = 0
@@ -278,8 +289,11 @@ def test_server_end_to_end_over_real_websocket():
                 async with websockets.connect(f"ws://localhost:{port}") as client:
                     raw = await asyncio.wait_for(client.recv(), timeout=2)
                     state = json.loads(raw)
-                    assert state["type"] == "tick"
-                    initial_robot_count = state["robot_count"]
+                    # split is the server's real default now — the shipped frontend
+                    # never sends set_mode, so this is what a fresh connection actually
+                    # gets, not a special case to opt into.
+                    assert state["type"] == "tick_split"
+                    initial_robot_count = state["boards"]["naive"]["robot_count"]
 
                     await client.send(json.dumps({"action": "set_robot_count", "count": initial_robot_count + 5}))
 
@@ -287,9 +301,10 @@ def test_server_end_to_end_over_real_websocket():
                     for _ in range(30):
                         raw = await asyncio.wait_for(client.recv(), timeout=2)
                         state = json.loads(raw)
-                        if state["robot_count"] == initial_robot_count + 5:
+                        if state["boards"]["naive"]["robot_count"] == initial_robot_count + 5:
                             break
-                    assert state["robot_count"] == initial_robot_count + 5
+                    assert state["boards"]["naive"]["robot_count"] == initial_robot_count + 5
+                    assert state["boards"]["warden"]["robot_count"] == initial_robot_count + 5
             finally:
                 loop_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):

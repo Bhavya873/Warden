@@ -16,7 +16,7 @@
   <header class="console-header">
     <div class="title-block">
       <h1>Warden</h1>
-      <p class="tagline">Collision-free zone claiming for a warehouse robot fleet</p>
+      <p class="tagline">Naive vs. Warden coordination, side by side, on identical warehouse robot fleets</p>
     </div>
     <div class="header-status">
       <span id="connection-text">connecting&hellip;</span>
@@ -26,15 +26,14 @@
 
   <main class="layout">
     <section class="floor-area">
-      <canvas id="floor" width="600" height="600"></canvas>
-      <div id="split-floors" class="split-floors">
+      <div class="split-floors">
         <div class="split-floor">
-          <h3>Naive</h3>
-          <canvas id="floor-naive" width="380" height="380"></canvas>
+          <h3><span class="dot dot-naive"></span>Naive</h3>
+          <canvas id="floor-naive" width="460" height="460"></canvas>
         </div>
         <div class="split-floor">
-          <h3>Warden</h3>
-          <canvas id="floor-warden" width="380" height="380"></canvas>
+          <h3><span class="dot dot-warden"></span>Warden</h3>
+          <canvas id="floor-warden" width="460" height="460"></canvas>
         </div>
       </div>
       <ul class="legend">
@@ -46,14 +45,6 @@
     </section>
 
     <aside class="controls">
-      <div class="control">
-        <label for="mode">Mode</label>
-        <select id="mode">
-          <option value="warden">Warden</option>
-          <option value="naive">Naive</option>
-          <option value="split">Split (Naive vs Warden)</option>
-        </select>
-      </div>
       <div class="control">
         <label for="robot-count">
           Robots <span class="mono value" id="robot-count-value">20</span>
@@ -74,34 +65,15 @@
           <option value="degraded">Degraded</option>
           <option value="adversarial">Adversarial</option>
         </select>
-        <span class="hint">Warden's filter refresh interval — no effect in Naive mode</span>
+        <span class="hint">Warden's filter refresh interval — no effect on the Naive board</span>
       </div>
     </aside>
   </main>
 
   <section class="dashboard">
-    <dl class="totals" id="totals-single">
-      <div class="total">
-        <dt>Total moves</dt>
-        <dd class="mono" id="total-moves">0</dd>
-      </div>
-      <div class="total">
-        <dt>Total confirm-checks</dt>
-        <dd class="mono" id="total-confirmed">0</dd>
-      </div>
-      <div class="total">
-        <dt>Total conflicts avoided</dt>
-        <dd class="mono" id="total-conflicts">0</dd>
-      </div>
-      <div class="total total-near-miss">
-        <dt>Total near-misses</dt>
-        <dd class="mono" id="total-near-misses">0</dd>
-      </div>
-    </dl>
-
-    <div class="totals-split" id="totals-split">
+    <div class="totals-split">
       <div class="totals-column">
-        <h4>Naive</h4>
+        <h4><span class="dot dot-naive"></span>Naive</h4>
         <dl class="totals">
           <div class="total"><dt>Moves</dt><dd class="mono" id="split-naive-total-moves">0</dd></div>
           <div class="total"><dt>Confirmed</dt><dd class="mono" id="split-naive-total-confirmed">0</dd></div>
@@ -110,7 +82,7 @@
         </dl>
       </div>
       <div class="totals-column">
-        <h4>Warden</h4>
+        <h4><span class="dot dot-warden"></span>Warden</h4>
         <dl class="totals">
           <div class="total"><dt>Moves</dt><dd class="mono" id="split-warden-total-moves">0</dd></div>
           <div class="total"><dt>Confirmed</dt><dd class="mono" id="split-warden-total-confirmed">0</dd></div>

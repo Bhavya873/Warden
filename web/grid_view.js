@@ -1,7 +1,7 @@
-// Renders the floor grid(s), connects to the WS server, wires up the live controls, and
-// drives the Chart.js dashboard. Message schema this expects: see server/ws_server.py's
-// module docstring — single mode sends {"type": "tick", ...}, split mode sends
-// {"type": "tick_split", "boards": {"naive": {...}, "warden": {...}}}.
+// Renders the two floor grids (Naive vs. Warden — the only view; no mode selector),
+// connects to the WS server, wires up the live controls, and drives the Chart.js
+// dashboard. Message schema: see server/ws_server.py's module docstring — the server
+// always sends {"type": "tick_split", "boards": {"naive": {...}, "warden": {...}}}.
 
 const WS_URL = "ws://localhost:8765";
 const LOAD_CHART_WINDOW = 150; // ticks of history kept for the rolling line chart
@@ -12,8 +12,9 @@ const COLORS = {
   line: "#e4e7ec",
   ink: "#14181f",
   inkMuted: "#6b7280",
-  structural: "#3b5bdb", // Warden series in split charts
-  accentNaive: "#c9682e", // Naive series in split charts
+  panel: "#ffffff",
+  structural: "#3b5bdb", // Warden series
+  accentNaive: "#c9682e", // Naive series
   moved: "#2e9e4f",
   waiting: "#c98a12",
   conflict: "#d64545",
@@ -24,15 +25,11 @@ const COLORS = {
 // text, which visually mismatches the rest of the page.
 Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
 
-const floorCanvas = document.getElementById("floor");
-const floorCtx = floorCanvas.getContext("2d");
-const splitFloors = document.getElementById("split-floors");
 const floorNaiveCanvas = document.getElementById("floor-naive");
 const floorNaiveCtx = floorNaiveCanvas.getContext("2d");
 const floorWardenCanvas = document.getElementById("floor-warden");
 const floorWardenCtx = floorWardenCanvas.getContext("2d");
 
-const modeSelect = document.getElementById("mode");
 const robotCountInput = document.getElementById("robot-count");
 const robotCountValue = document.getElementById("robot-count-value");
 const gridSizeInput = document.getElementById("grid-size");
@@ -41,13 +38,6 @@ const broadcastLagSelect = document.getElementById("broadcast-lag");
 const connectionText = document.getElementById("connection-text");
 const statTick = document.getElementById("stat-tick");
 
-const totalsSingle = document.getElementById("totals-single");
-const totalMoves = document.getElementById("total-moves");
-const totalConfirmed = document.getElementById("total-confirmed");
-const totalConflicts = document.getElementById("total-conflicts");
-const totalNearMisses = document.getElementById("total-near-misses");
-
-const totalsSplit = document.getElementById("totals-split");
 const splitTotalEls = {
   naive: {
     moves: document.getElementById("split-naive-total-moves"),
@@ -66,133 +56,61 @@ const splitTotalEls = {
 let socket = null;
 
 // --- Charts ------------------------------------------------------------
-// Recreated (destroy + new Chart) whenever switching between single and split mode,
-// since the two shapes need a different number of datasets — simpler and safer than
-// trying to reshape datasets in place.
 
-let mixChart = null;
-let loadChart = null;
-let chartsMode = null; // "single" | "split"
+const mixChart = new Chart(document.getElementById("mix-chart"), {
+  type: "bar",
+  data: {
+    labels: ["Instant", "Confirmed", "Conflicts avoided", "Near-misses"],
+    datasets: [
+      { label: "Naive", data: [0, 0, 0, 0], backgroundColor: COLORS.accentNaive },
+      { label: "Warden", data: [0, 0, 0, 0], backgroundColor: COLORS.structural },
+    ],
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: true }, title: { display: true, text: "Move outcomes (this tick)" } },
+    scales: { y: { beginAtZero: true } },
+  },
+});
 
-function destroyCharts() {
-  if (mixChart) mixChart.destroy();
-  if (loadChart) loadChart.destroy();
-  mixChart = null;
-  loadChart = null;
-}
+const loadChart = new Chart(document.getElementById("load-chart"), {
+  type: "line",
+  data: {
+    labels: [],
+    datasets: [
+      {
+        label: "Naive queue depth",
+        data: [],
+        borderColor: COLORS.accentNaive,
+        backgroundColor: "transparent",
+        pointRadius: 0,
+        borderWidth: 2,
+        tension: 0.25,
+      },
+      {
+        label: "Warden queue depth",
+        data: [],
+        borderColor: COLORS.structural,
+        backgroundColor: "transparent",
+        pointRadius: 0,
+        borderWidth: 2,
+        tension: 0.25,
+      },
+    ],
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    plugins: { legend: { display: true }, title: { display: true, text: "Coordinator load (rolling)" } },
+    scales: { x: { display: false }, y: { beginAtZero: true } },
+  },
+});
 
-function createSingleCharts() {
-  destroyCharts();
-  mixChart = new Chart(document.getElementById("mix-chart"), {
-    type: "bar",
-    data: {
-      labels: ["Instant", "Confirmed", "Conflicts avoided", "Near-misses"],
-      datasets: [
-        {
-          label: "This tick",
-          data: [0, 0, 0, 0],
-          // Near-misses use purple, not red — a near-miss is the filter/coordinator
-          // being wrong, not a correctly-caught conflict (tasks/staleness-finding.md).
-          backgroundColor: [COLORS.moved, COLORS.waiting, COLORS.conflict, COLORS.nearMiss],
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false }, title: { display: true, text: "Move outcomes (this tick)" } },
-      scales: { y: { beginAtZero: true } },
-    },
-  });
-
-  loadChart = new Chart(document.getElementById("load-chart"), {
-    type: "line",
-    data: {
-      labels: [],
-      datasets: [
-        {
-          label: "Coordinator queue depth",
-          data: [],
-          borderColor: COLORS.structural,
-          backgroundColor: "transparent",
-          pointRadius: 0,
-          tension: 0.2,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      plugins: { legend: { display: false }, title: { display: true, text: "Coordinator load (rolling)" } },
-      scales: { x: { display: false }, y: { beginAtZero: true } },
-    },
-  });
-
-  chartsMode = "single";
-}
-
-function createSplitCharts() {
-  destroyCharts();
-  mixChart = new Chart(document.getElementById("mix-chart"), {
-    type: "bar",
-    data: {
-      labels: ["Instant", "Confirmed", "Conflicts avoided", "Near-misses"],
-      datasets: [
-        { label: "Naive", data: [0, 0, 0, 0], backgroundColor: COLORS.accentNaive },
-        { label: "Warden", data: [0, 0, 0, 0], backgroundColor: COLORS.structural },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: true }, title: { display: true, text: "Move outcomes (this tick)" } },
-      scales: { y: { beginAtZero: true } },
-    },
-  });
-
-  loadChart = new Chart(document.getElementById("load-chart"), {
-    type: "line",
-    data: {
-      labels: [],
-      datasets: [
-        {
-          label: "Naive queue depth",
-          data: [],
-          borderColor: COLORS.accentNaive,
-          backgroundColor: "transparent",
-          pointRadius: 0,
-          tension: 0.2,
-        },
-        {
-          label: "Warden queue depth",
-          data: [],
-          borderColor: COLORS.structural,
-          backgroundColor: "transparent",
-          pointRadius: 0,
-          tension: 0.2,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      plugins: { legend: { display: true }, title: { display: true, text: "Coordinator load (rolling)" } },
-      scales: { x: { display: false }, y: { beginAtZero: true } },
-    },
-  });
-
-  chartsMode = "split";
-}
-
-function pushRolling(labels, data, tick, value) {
-  labels.push(tick);
+function pushRolling(data, value) {
   data.push(value);
-  if (labels.length > LOAD_CHART_WINDOW) {
-    labels.shift();
-    data.shift();
-  }
+  if (data.length > LOAD_CHART_WINDOW) data.shift();
 }
 
 // --- WebSocket -----------------------------------------------------------
@@ -214,56 +132,13 @@ function connect() {
   });
 
   socket.addEventListener("message", (event) => {
-    const state = JSON.parse(event.data);
-    if (state.type === "tick_split") {
-      renderSplit(state);
-    } else {
-      renderSingle(state);
-    }
+    render(JSON.parse(event.data));
   });
 }
 
-// --- Rendering: single mode ------------------------------------------------
+// --- Rendering --------------------------------------------------------------
 
-function renderSingle(state) {
-  floorCanvas.classList.remove("hidden");
-  splitFloors.classList.remove("active");
-  totalsSingle.classList.remove("hidden");
-  totalsSplit.classList.remove("active");
-
-  if (chartsMode !== "single") createSingleCharts();
-
-  drawFloor(floorCtx, floorCanvas, state.grid_size, state.robots);
-
-  mixChart.data.datasets[0].data = [
-    state.stats.instant_moves,
-    state.stats.confirmed_checks,
-    state.stats.conflicts_avoided,
-    state.stats.near_misses,
-  ];
-  mixChart.update("none");
-  pushRolling(loadChart.data.labels, loadChart.data.datasets[0].data, state.tick, state.stats.queue_depth);
-  loadChart.update("none");
-
-  statTick.textContent = `(tick ${state.tick})`;
-  totalMoves.textContent = state.totals.instant_moves + state.totals.confirmed_checks;
-  totalConfirmed.textContent = state.totals.confirmed_checks;
-  totalConflicts.textContent = state.totals.conflicts_avoided;
-  totalNearMisses.textContent = state.totals.near_misses;
-
-  syncControls(state.mode, state.robot_count, state.grid_size, state.broadcast_lag);
-}
-
-// --- Rendering: split mode ---------------------------------------------
-
-function renderSplit(state) {
-  floorCanvas.classList.add("hidden");
-  splitFloors.classList.add("active");
-  totalsSingle.classList.add("hidden");
-  totalsSplit.classList.add("active");
-
-  if (chartsMode !== "split") createSplitCharts();
-
+function render(state) {
   const naive = state.boards.naive;
   const warden = state.boards.warden;
 
@@ -284,13 +159,9 @@ function renderSplit(state) {
   ];
   mixChart.update("none");
 
-  pushRolling(loadChart.data.labels, loadChart.data.datasets[0].data, naive.tick, naive.stats.queue_depth);
-  // naive and warden boards are stepped together, so they share one label timeline —
-  // only push the second dataset's value, not a second set of labels.
-  loadChart.data.datasets[1].data.push(warden.stats.queue_depth);
-  if (loadChart.data.datasets[1].data.length > LOAD_CHART_WINDOW) {
-    loadChart.data.datasets[1].data.shift();
-  }
+  pushRolling(loadChart.data.datasets[0].data, naive.stats.queue_depth);
+  pushRolling(loadChart.data.datasets[1].data, warden.stats.queue_depth);
+  pushRolling(loadChart.data.labels, naive.tick); // both boards are stepped together, one shared timeline
   loadChart.update("none");
 
   statTick.textContent = `(tick ${naive.tick})`;
@@ -303,10 +174,10 @@ function renderSplit(state) {
   splitTotalEls.warden.conflicts.textContent = warden.totals.conflicts_avoided;
   splitTotalEls.warden.nearMisses.textContent = warden.totals.near_misses;
 
-  syncControls("split", naive.robot_count, state.grid_size, state.broadcast_lag);
+  syncControls(naive.robot_count, state.grid_size, state.broadcast_lag);
 }
 
-// --- Shared floor drawing -------------------------------------------------
+// --- Floor drawing -------------------------------------------------
 
 // robot.outcome -> fill color. "idle" (sitting at its current target, nothing pending)
 // stays a quiet neutral so the three active states read clearly against it.
@@ -325,7 +196,7 @@ function drawFloor(ctx, canvas, gridSize, robots) {
   ctx.strokeStyle = COLORS.line;
   ctx.lineWidth = 1;
   for (let i = 0; i <= gridSize; i++) {
-    const p = i * cellSize;
+    const p = Math.round(i * cellSize) + 0.5; // crisp 1px lines, not antialiased blur
     ctx.beginPath();
     ctx.moveTo(p, 0);
     ctx.lineTo(p, canvas.height);
@@ -336,26 +207,31 @@ function drawFloor(ctx, canvas, gridSize, robots) {
     ctx.stroke();
   }
 
-  const radius = cellSize * 0.35;
+  const radius = cellSize * 0.32;
 
   for (const robot of robots) {
     const cx = robot.x * cellSize + cellSize / 2;
     const cy = robot.y * cellSize + cellSize / 2;
 
+    // A light halo behind each dot lifts it off the gridlines without a heavy dark
+    // outline — a softer, flatter treatment than an ink border on every robot.
+    ctx.fillStyle = COLORS.panel;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius + 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.fillStyle = OUTCOME_COLORS[robot.outcome] || COLORS.inkMuted;
-    ctx.strokeStyle = COLORS.ink;
-    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.fill();
-    ctx.stroke();
 
     if (robot.dx !== 0 || robot.dy !== 0) {
       ctx.strokeStyle = COLORS.ink;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = "round";
       ctx.beginPath();
       ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + robot.dx * radius * 1.6, cy + robot.dy * radius * 1.6);
+      ctx.lineTo(cx + robot.dx * radius * 1.5, cy + robot.dy * radius * 1.5);
       ctx.stroke();
     }
 
@@ -363,9 +239,9 @@ function drawFloor(ctx, canvas, gridSize, robots) {
     // a distinct ring, not red, so it isn't mistaken for a caught conflict.
     if (robot.near_miss) {
       ctx.strokeStyle = COLORS.nearMiss;
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.arc(cx, cy, radius * 1.8, 0, Math.PI * 2);
+      ctx.arc(cx, cy, radius * 1.7, 0, Math.PI * 2);
       ctx.stroke();
     }
   }
@@ -373,10 +249,7 @@ function drawFloor(ctx, canvas, gridSize, robots) {
 
 // --- Controls --------------------------------------------------------------
 
-function syncControls(mode, robotCount, gridSize, broadcastLag) {
-  if (modeSelect.value !== mode) {
-    modeSelect.value = mode;
-  }
+function syncControls(robotCount, gridSize, broadcastLag) {
   // Don't stomp on a control the user is actively dragging.
   if (document.activeElement !== robotCountInput) {
     robotCountInput.value = robotCount;
@@ -396,10 +269,6 @@ function send(message) {
     socket.send(JSON.stringify(message));
   }
 }
-
-modeSelect.addEventListener("change", () => {
-  send({ action: "set_mode", mode: modeSelect.value });
-});
 
 broadcastLagSelect.addEventListener("change", () => {
   send({ action: "set_broadcast_lag", level: broadcastLagSelect.value });

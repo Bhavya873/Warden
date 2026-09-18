@@ -67,6 +67,47 @@ def test_no_permanent_gridlock():
     assert moves_in_final_window > 0, "fleet is permanently gridlocked"
 
 
+def test_bounded_local_targets_reduce_center_clustering():
+    # Regression for the "robots huddle in the middle" behavior: point-to-point
+    # trips between fully uniform random targets concentrate near the grid's center
+    # (a geometric-probability effect — the same reason the midpoint of two uniform
+    # random points clusters toward the center of a region). Bounding new targets to
+    # a local radius around the robot's current position should measurably reduce
+    # that, not eliminate it outright.
+    import core.grid_world as gw
+    from core.coordinator import WardenCoordinator
+
+    def center_fraction(divisor):
+        original = gw.TARGET_LOCALITY_DIVISOR
+        gw.TARGET_LOCALITY_DIVISOR = divisor
+        try:
+            grid_size, robot_count, seed, ticks = 30, 60, 7, 1500
+            world = GridWorld(grid_size=grid_size, robot_count=robot_count, seed=seed)
+            wc = WardenCoordinator(robot_count=robot_count, seed=seed)
+            center = grid_size / 2
+            center_radius = grid_size * 0.2
+            samples = in_center = 0
+            for t in range(1, ticks + 1):
+                wc.tick(t, world.occupied_cells())
+                world.tick(policy=wc)
+                if t % 10 == 0:
+                    for r in world.robots:
+                        samples += 1
+                        d = ((r.x - center) ** 2 + (r.y - center) ** 2) ** 0.5
+                        if d < center_radius:
+                            in_center += 1
+            return in_center / samples
+        finally:
+            gw.TARGET_LOCALITY_DIVISOR = original
+
+    fully_random = center_fraction(divisor=1)  # radius == grid_size, covers the whole grid
+    bounded = center_fraction(divisor=5)
+    assert bounded < fully_random * 0.7, (
+        f"expected bounded-target locality to meaningfully reduce center clustering, "
+        f"got bounded={bounded:.3f} vs fully_random={fully_random:.3f}"
+    )
+
+
 def test_add_robot_on_a_full_grid_fails_fast_instead_of_hanging():
     # Regression: _random_free_cell() used to spin forever once the grid had no free
     # cells left (every server WS control message that could overfill a grid — e.g.

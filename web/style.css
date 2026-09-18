@@ -100,7 +100,6 @@ body {
   gap: 16px;
 }
 
-#floor,
 .split-floor canvas {
   border: 1px solid var(--line);
   background: var(--panel);
@@ -108,30 +107,40 @@ body {
   height: auto;
 }
 
-#floor.hidden {
-  display: none;
-}
-
 .split-floors {
-  display: none;
-  gap: 16px;
-}
-
-.split-floors.active {
   display: flex;
+  gap: 20px;
   flex-wrap: wrap;
 }
 
 .split-floor {
-  flex: 1 1 320px;
+  flex: 1 1 340px;
   min-width: 0;
 }
 
 .split-floor h3 {
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 500;
-  margin: 0 0 6px;
-  color: var(--ink-muted);
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.dot-naive {
+  background: var(--accent-naive);
+}
+
+.dot-warden {
+  background: var(--structural);
 }
 
 /* --- Legend ------------------------------------------------------------- */
@@ -249,12 +258,8 @@ input:focus-visible {
   display: flex;
   gap: 40px;
   flex-wrap: wrap;
-  margin: 0 0 32px;
+  margin: 0;
   padding: 0;
-}
-
-#totals-single.hidden {
-  display: none;
 }
 
 .total dt {
@@ -274,14 +279,10 @@ input:focus-visible {
 }
 
 .totals-split {
-  display: none;
+  display: flex;
   gap: 56px;
   flex-wrap: wrap;
   margin: 0 0 32px;
-}
-
-.totals-split.active {
-  display: flex;
 }
 
 .totals-column h4 {
@@ -289,6 +290,9 @@ input:focus-visible {
   font-weight: 500;
   margin: 0 0 8px;
   color: var(--ink-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .totals-column .totals {

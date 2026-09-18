@@ -1,28 +1,28 @@
-/* Warden — clean instrument dashboard.
-   Whitespace does the separating instead of rules — borders survive only where they
-   mark a literal edge (the floor canvas, the chart panels). Two elevation tiers, used
-   narrowly: the floor stays flat (it's the raw instrument reading), the two chart
-   panels get radius + a soft shadow (they're the reporting layer). Two chrome accents
-   (Warden blue, Naive rust), each tied to a real thing, no third decorative color.
-   Saturated color is otherwise reserved entirely for the move-outcome legend
-   (green/amber/red/purple) so it reads unambiguously against the quiet chrome. */
+/* Warden — fleet operations console.
+   This is a live monitor for a robot fleet, so it borrows the visual language real
+   ops/monitoring tools use: a dark surface so status color reads at a glance, glanceable
+   glowing accents instead of decoration, and elevation done the way dark UIs actually
+   do it (a lighter surface tone, not a shadow — shadows don't read against a dark
+   background). Two chrome accents (Warden blue, Naive rust), each tied to a real thing;
+   saturated color is otherwise reserved entirely for the move-outcome legend
+   (green/amber/red/violet) so it reads unambiguously against the quiet chrome. */
 
 :root {
-  --paper: #f7f8fa;
-  --panel: #ffffff;
-  --ink: #14181f;
-  --ink-muted: #6b7280;
-  --line: #e4e7ec;
-  --structural: #3b5bdb;
-  --accent-naive: #c9682e;
+  --bg: #0a0d13;
+  --surface: #12161f;
+  --surface-raised: #171c28;
+  --ink: #eef1f6;
+  --ink-muted: #8892a3;
+  --line: #232838;
+  --structural: #5b8cff;
+  --accent-naive: #e8935c;
 
-  --status-moved: #2e9e4f;
-  --status-waiting: #c98a12;
-  --status-conflict: #d64545;
-  --status-near-miss: #8b3fc9;
+  --status-moved: #34d399;
+  --status-waiting: #fbbf24;
+  --status-conflict: #f87171;
+  --status-near-miss: #c084fc;
 
-  --radius: 6px;
-  --shadow-sm: 0 1px 2px rgba(20, 24, 31, 0.06), 0 1px 1px rgba(20, 24, 31, 0.04);
+  --radius: 8px;
 
   --font-sans: "IBM Plex Sans", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -34,7 +34,7 @@
 
 body {
   font-family: var(--font-sans);
-  background: var(--paper);
+  background: var(--bg);
   color: var(--ink);
   margin: 0 auto;
   max-width: 1400px;
@@ -59,24 +59,52 @@ body {
 }
 
 .title-block h1 {
-  font-size: 1.75rem;
+  font-size: 1.875rem;
   font-weight: 600;
   margin: 0;
-  letter-spacing: 0.01em;
-}
-
-.tagline {
-  margin: 4px 0 0;
-  color: var(--ink-muted);
-  font-size: 0.9rem;
+  letter-spacing: -0.01em;
 }
 
 .header-status {
   font-size: 0.85rem;
   color: var(--ink-muted);
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   white-space: nowrap;
+}
+
+/* The one deliberate motion moment on the page: a live dot pulses while connected,
+   sits flat and dim while not — everything else on the page is static or driven
+   directly by data changing, never animated for its own sake. */
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-muted);
+  flex-shrink: 0;
+}
+
+.live-dot.connected {
+  background: var(--status-moved);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.18);
+  animation: pulse 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot.connected {
+    animation: none;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* --- Layout ----------------------------------------------------------- */
@@ -102,7 +130,7 @@ body {
 
 .split-floor canvas {
   border: 1px solid var(--line);
-  background: var(--panel);
+  background: var(--surface);
   max-width: 100%;
   height: auto;
 }
@@ -127,6 +155,11 @@ body {
   gap: 8px;
 }
 
+.board-desc {
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+
 .dot {
   width: 8px;
   height: 8px;
@@ -141,6 +174,7 @@ body {
 
 .dot-warden {
   background: var(--structural);
+  box-shadow: 0 0 8px rgba(91, 140, 255, 0.6);
 }
 
 /* --- Legend ------------------------------------------------------------- */
@@ -218,13 +252,8 @@ body {
 }
 
 .control .value {
-  color: var(--ink-muted);
-  font-weight: 400;
-}
-
-.control .hint {
-  font-size: 0.78rem;
-  color: var(--ink-muted);
+  color: var(--structural);
+  font-weight: 500;
 }
 
 select,
@@ -235,7 +264,7 @@ input[type="range"] {
 
 select {
   border: 1px solid var(--line);
-  background: var(--panel);
+  background: var(--surface);
   color: var(--ink);
   padding: 7px 10px;
   border-radius: var(--radius);
@@ -270,8 +299,9 @@ input:focus-visible {
 
 .total dd {
   margin: 0;
-  font-size: 1.75rem;
+  font-size: 1.875rem;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .total-near-miss dd {
@@ -310,8 +340,8 @@ input:focus-visible {
   flex: 1 1 380px;
   height: 260px;
   border: 1px solid var(--line);
-  background: var(--panel);
+  border-top-color: #2c3348;
+  background: var(--surface-raised);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
   padding: 16px;
 }

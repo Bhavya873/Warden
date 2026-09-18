@@ -16,9 +16,9 @@
   <header class="console-header">
     <div class="title-block">
       <h1>Warden</h1>
-      <p class="tagline">Naive vs. Warden coordination, side by side, on identical warehouse robot fleets</p>
     </div>
     <div class="header-status">
+      <span id="live-dot" class="live-dot"></span>
       <span id="connection-text">connecting&hellip;</span>
       <span id="stat-tick" class="mono"></span>
     </div>
@@ -28,19 +28,25 @@
     <section class="floor-area">
       <div class="split-floors">
         <div class="split-floor">
-          <h3><span class="dot dot-naive"></span>Naive</h3>
+          <h3><span class="dot dot-naive"></span>Baseline <span class="board-desc">— server-side decisions</span></h3>
           <canvas id="floor-naive" width="460" height="460"></canvas>
         </div>
         <div class="split-floor">
-          <h3><span class="dot dot-warden"></span>Warden</h3>
+          <h3><span class="dot dot-warden"></span>Warden <span class="board-desc">— local-first decisions</span></h3>
           <canvas id="floor-warden" width="460" height="460"></canvas>
         </div>
       </div>
       <ul class="legend">
         <li><span class="swatch swatch-moved"></span>Moved</li>
-        <li><span class="swatch swatch-waiting"></span>Waiting on a confirm-check</li>
-        <li><span class="swatch swatch-conflict"></span>Conflict avoided</li>
-        <li><span class="swatch swatch-near-miss"></span>Near-miss (ring)</li>
+        <li title="Waiting on a round trip to the server before it can move">
+          <span class="swatch swatch-waiting"></span>Waiting
+        </li>
+        <li title="The server found this cell already taken and blocked the move">
+          <span class="swatch swatch-conflict"></span>Conflict caught
+        </li>
+        <li title="The local filter said this cell was free, but the server's check caught that it wasn't — no collision happened">
+          <span class="swatch swatch-near-miss"></span>Near-miss
+        </li>
       </ul>
     </section>
 
@@ -50,7 +56,6 @@
           Robots <span class="mono value" id="robot-count-value">20</span>
         </label>
         <input id="robot-count" type="range" min="1" max="150" value="20" />
-        <span class="hint">Drag to the high end for a density stress test</span>
       </div>
       <div class="control">
         <label for="grid-size">
@@ -59,13 +64,14 @@
         <input id="grid-size" type="range" min="10" max="40" value="30" />
       </div>
       <div class="control">
-        <label for="broadcast-lag">Broadcast lag</label>
+        <label for="broadcast-lag" title="How often Warden's local filter refreshes — no effect on the Baseline board">
+          Broadcast lag
+        </label>
         <select id="broadcast-lag">
           <option value="normal">Normal</option>
           <option value="degraded">Degraded</option>
           <option value="adversarial">Adversarial</option>
         </select>
-        <span class="hint">Warden's filter refresh interval — no effect on the Naive board</span>
       </div>
     </aside>
   </main>
@@ -73,21 +79,21 @@
   <section class="dashboard">
     <div class="totals-split">
       <div class="totals-column">
-        <h4><span class="dot dot-naive"></span>Naive</h4>
+        <h4><span class="dot dot-naive"></span>Baseline</h4>
         <dl class="totals">
           <div class="total"><dt>Moves</dt><dd class="mono" id="split-naive-total-moves">0</dd></div>
-          <div class="total"><dt>Confirmed</dt><dd class="mono" id="split-naive-total-confirmed">0</dd></div>
-          <div class="total"><dt>Conflicts avoided</dt><dd class="mono" id="split-naive-total-conflicts">0</dd></div>
-          <div class="total total-near-miss"><dt>Near-misses</dt><dd class="mono" id="split-naive-total-near-misses">0</dd></div>
+          <div class="total"><dt title="Moves that needed a round trip to the server">Checked</dt><dd class="mono" id="split-naive-total-confirmed">0</dd></div>
+          <div class="total"><dt title="The server found a real conflict and blocked the move">Conflicts caught</dt><dd class="mono" id="split-naive-total-conflicts">0</dd></div>
+          <div class="total total-near-miss"><dt title="Filter said free, server's check caught it was wrong — no collision happened">Near-misses</dt><dd class="mono" id="split-naive-total-near-misses">0</dd></div>
         </dl>
       </div>
       <div class="totals-column">
         <h4><span class="dot dot-warden"></span>Warden</h4>
         <dl class="totals">
           <div class="total"><dt>Moves</dt><dd class="mono" id="split-warden-total-moves">0</dd></div>
-          <div class="total"><dt>Confirmed</dt><dd class="mono" id="split-warden-total-confirmed">0</dd></div>
-          <div class="total"><dt>Conflicts avoided</dt><dd class="mono" id="split-warden-total-conflicts">0</dd></div>
-          <div class="total total-near-miss"><dt>Near-misses</dt><dd class="mono" id="split-warden-total-near-misses">0</dd></div>
+          <div class="total"><dt title="Moves that needed a round trip to the server">Checked</dt><dd class="mono" id="split-warden-total-confirmed">0</dd></div>
+          <div class="total"><dt title="The server found a real conflict and blocked the move">Conflicts caught</dt><dd class="mono" id="split-warden-total-conflicts">0</dd></div>
+          <div class="total total-near-miss"><dt title="Filter said free, server's check caught it was wrong — no collision happened">Near-misses</dt><dd class="mono" id="split-warden-total-near-misses">0</dd></div>
         </dl>
       </div>
     </div>

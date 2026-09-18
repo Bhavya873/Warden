@@ -1,7 +1,9 @@
-// Renders the two floor grids (Naive vs. Warden — the only view; no mode selector),
+// Renders the two floor grids (Baseline vs. Warden — the only view; no mode selector),
 // connects to the WS server, wires up the live controls, and drives the Chart.js
 // dashboard. Message schema: see server/ws_server.py's module docstring — the server
 // always sends {"type": "tick_split", "boards": {"naive": {...}, "warden": {...}}}.
+// "naive" is the wire-protocol/internal name (unchanged); "Baseline" is just the
+// user-facing label for it, renamed because "Naive" read as unclear/judgmental.
 
 const WS_URL = "ws://localhost:8765";
 const LOAD_CHART_WINDOW = 150; // ticks of history kept for the rolling line chart
@@ -9,21 +11,23 @@ const LOAD_CHART_WINDOW = 150; // ticks of history kept for the rolling line cha
 // Mirrors the custom properties in style.css — kept in sync by hand, small enough not
 // to warrant a shared token pipeline between CSS and canvas/Chart.js drawing code.
 const COLORS = {
-  line: "#e4e7ec",
-  ink: "#14181f",
-  inkMuted: "#6b7280",
-  panel: "#ffffff",
-  structural: "#3b5bdb", // Warden series
-  accentNaive: "#c9682e", // Naive series
-  moved: "#2e9e4f",
-  waiting: "#c98a12",
-  conflict: "#d64545",
-  nearMiss: "#8b3fc9",
+  line: "#232838",
+  ink: "#eef1f6",
+  inkMuted: "#8892a3",
+  panel: "#12161f", // --surface — canvas backdrop
+  structural: "#5b8cff", // Warden series
+  accentNaive: "#e8935c", // Naive series
+  moved: "#34d399",
+  waiting: "#fbbf24",
+  conflict: "#f87171",
+  nearMiss: "#c084fc",
 };
 
-// Chart.js otherwise falls back to the browser's default sans-serif for titles/legend
-// text, which visually mismatches the rest of the page.
+// Chart.js defaults assume a light page — set text/grid colors explicitly for the dark
+// theme, and match the page's typeface instead of the browser's default sans-serif.
 Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
+Chart.defaults.color = COLORS.inkMuted;
+Chart.defaults.borderColor = COLORS.line;
 
 const floorNaiveCanvas = document.getElementById("floor-naive");
 const floorNaiveCtx = floorNaiveCanvas.getContext("2d");
@@ -35,6 +39,7 @@ const robotCountValue = document.getElementById("robot-count-value");
 const gridSizeInput = document.getElementById("grid-size");
 const gridSizeValue = document.getElementById("grid-size-value");
 const broadcastLagSelect = document.getElementById("broadcast-lag");
+const liveDot = document.getElementById("live-dot");
 const connectionText = document.getElementById("connection-text");
 const statTick = document.getElementById("stat-tick");
 
@@ -60,9 +65,9 @@ let socket = null;
 const mixChart = new Chart(document.getElementById("mix-chart"), {
   type: "bar",
   data: {
-    labels: ["Instant", "Confirmed", "Conflicts avoided", "Near-misses"],
+    labels: ["Instant", "Checked", "Conflicts caught", "Near-misses"],
     datasets: [
-      { label: "Naive", data: [0, 0, 0, 0], backgroundColor: COLORS.accentNaive },
+      { label: "Baseline", data: [0, 0, 0, 0], backgroundColor: COLORS.accentNaive },
       { label: "Warden", data: [0, 0, 0, 0], backgroundColor: COLORS.structural },
     ],
   },
@@ -80,7 +85,7 @@ const loadChart = new Chart(document.getElementById("load-chart"), {
     labels: [],
     datasets: [
       {
-        label: "Naive queue depth",
+        label: "Baseline queue depth",
         data: [],
         borderColor: COLORS.accentNaive,
         backgroundColor: "transparent",
@@ -120,10 +125,12 @@ function connect() {
 
   socket.addEventListener("open", () => {
     connectionText.textContent = "connected";
+    liveDot.classList.add("connected");
   });
 
   socket.addEventListener("close", () => {
     connectionText.textContent = "disconnected, retrying…";
+    liveDot.classList.remove("connected");
     setTimeout(connect, 1000);
   });
 

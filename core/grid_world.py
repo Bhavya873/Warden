@@ -76,18 +76,37 @@ class GridWorld:
             if cell not in self._occupied:
                 return cell
 
+    def _reflect_into_range(self, value: int) -> int:
+        """Folds `value` back into [0, grid_size) by mirror reflection (a triangle
+        wave), not clamping. Clamping a locally-sampled window at the grid boundary
+        truncates the distribution asymmetrically — a robot sitting at the edge, whose
+        window can't extend past the wall, ends up with a target distribution whose
+        mean is pulled inward (measured: a robot pinned at x=0 got a mean target x of
+        ~3.0, not the unbiased ~0). Reflection only softens that single-hop number
+        modestly (~3.0 -> ~2.8 in the same measurement — a discrete boundary can't be
+        made perfectly unbiased for a cell sitting exactly on it, some asymmetry is
+        unavoidable there), but that smaller per-hop drift compounds very differently
+        over many hops and many robots: the population-level center-clustering this
+        was meant to fix drops roughly 8x versus the clamped version, not by the ~8%
+        the single-hop number alone would suggest (see
+        tests/test_grid_world.py::test_bounded_local_targets_reduce_center_clustering
+        and ::test_target_sampling_near_a_boundary_is_not_pulled_inward, which measure
+        each effect separately rather than assuming one from the other)."""
+        if self.grid_size < 2:
+            return 0
+        period = 2 * self.grid_size
+        v = value % period
+        return v if v < self.grid_size else period - 1 - v
+
     def _random_target(self, exclude: Cell) -> Cell:
+        if self.grid_size < 2:
+            return exclude  # no alternative cell exists
         radius = max(2, self.grid_size // TARGET_LOCALITY_DIVISOR)
         cx, cy = exclude
-        x_lo, x_hi = max(0, cx - radius), min(self.grid_size - 1, cx + radius)
-        y_lo, y_hi = max(0, cy - radius), min(self.grid_size - 1, cy + radius)
-        if (x_hi - x_lo + 1) * (y_hi - y_lo + 1) <= 1:
-            # window collapsed to just `exclude` itself (only possible on a tiny grid) —
-            # fall back to the full grid rather than looping forever looking for a
-            # second option that doesn't exist in the local window.
-            x_lo, x_hi, y_lo, y_hi = 0, self.grid_size - 1, 0, self.grid_size - 1
         while True:
-            cell = (self._rng.randint(x_lo, x_hi), self._rng.randint(y_lo, y_hi))
+            dx = self._rng.randint(-radius, radius)
+            dy = self._rng.randint(-radius, radius)
+            cell = (self._reflect_into_range(cx + dx), self._reflect_into_range(cy + dy))
             if cell != exclude:
                 return cell
 

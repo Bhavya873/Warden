@@ -45,6 +45,7 @@ class Coordinator:
         self._outstanding_by_robot: dict[int, tuple[int, Cell]] = {}
 
         self._checks_this_tick = 0
+        self._conflicts_avoided_this_tick = 0
         self.log: list[dict] = []
 
     def claimed_cells(self) -> list[Cell]:
@@ -66,6 +67,8 @@ class Coordinator:
 
         claimed = self._responses.pop(request_id)
         del self._outstanding_by_robot[robot.robot_id]
+        if claimed:
+            self._conflicts_avoided_this_tick += 1  # the confirm-check found a real conflict
         return not claimed
 
     def _request_confirm(self, robot_id: int, cell: Cell) -> None:
@@ -102,11 +105,13 @@ class Coordinator:
             {
                 "tick": current_tick,
                 "confirm_checks": self._checks_this_tick,
+                "conflicts_avoided": self._conflicts_avoided_this_tick,
                 "queue_depth": len(self._pending),
                 "avg_delay": (sum(resolved_delays) / len(resolved_delays)) if resolved_delays else None,
             }
         )
         self._checks_this_tick = 0
+        self._conflicts_avoided_this_tick = 0
 
 
 DEFAULT_FILTER_REFRESH_INTERVAL_TICKS = 5
@@ -176,6 +181,7 @@ class WardenCoordinator:
                 "tick": current_tick,
                 "instant_moves": self.instant_moves_this_tick,
                 "confirmed_checks": self._coordinator.log[-1]["confirm_checks"],
+                "conflicts_avoided": self._coordinator.log[-1]["conflicts_avoided"],
                 "filter_refreshed": due_for_refresh,
             }
         )

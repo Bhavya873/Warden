@@ -22,8 +22,10 @@ def test_step_and_serialize_shape():
         "queue_depth",
         "instant_moves",
         "confirmed_checks",
+        "conflicts_avoided",
         "near_miss_count_total",
     }
+    assert set(state["totals"]) == {"instant_moves", "confirmed_checks", "conflicts_avoided"}
 
 
 def test_step_and_serialize_runs_cleanly_over_many_ticks():
@@ -48,6 +50,25 @@ def test_set_mode_preserves_robot_positions_and_tick_count():
     assert positions_after == positions_before
     assert targets_after == targets_before
     assert server.sim.world.tick_count == tick_before
+
+
+def test_totals_accumulate_and_reset_on_mode_switch():
+    server = SimulationServer()
+    for _ in range(20):
+        state = server.step_and_serialize()
+    assert state["totals"]["instant_moves"] + state["totals"]["confirmed_checks"] > 0
+    totals_before_switch = dict(state["totals"])
+    assert totals_before_switch == server.totals
+
+    server.set_mode("naive" if server.mode == "warden" else "warden")
+    assert server.totals == {"instant_moves": 0, "confirmed_checks": 0, "conflicts_avoided": 0}
+
+    state = server.step_and_serialize()
+    # totals resumed accumulating from zero in the new mode: after exactly one tick,
+    # they should equal that tick's own stats, not carry over the old mode's numbers
+    assert state["totals"]["instant_moves"] == state["stats"]["instant_moves"]
+    assert state["totals"]["confirmed_checks"] == state["stats"]["confirmed_checks"]
+    assert state["totals"]["conflicts_avoided"] == state["stats"]["conflicts_avoided"]
 
 
 def test_set_robot_count_add_and_remove():

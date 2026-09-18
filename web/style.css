@@ -40,25 +40,47 @@ h1 {
   color: #555;
 }
 
-.stats {
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 4px 12px;
-  margin: 0;
-  font-size: 0.9rem;
-}
-
-.stats dt {
-  color: #555;
-}
-
-.stats dd {
-  margin: 0;
-  font-weight: 600;
-  text-align: right;
+.control .hint {
+  color: #999;
+  font-weight: normal;
 }
 
 #connection-status {
   font-size: 0.8rem;
   color: #888;
+}
+
+.dashboard {
+  margin-top: 32px;
+  max-width: 900px;
+}
+
+.totals {
+  display: flex;
+  gap: 32px;
+  margin: 0 0 24px;
+}
+
+.total dt {
+  font-size: 0.8rem;
+  color: #555;
+}
+
+.total dd {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.charts {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.chart-box {
+  flex: 1 1 380px;
+  height: 260px;
+  border: 1px solid #eee;
+  padding: 12px;
 }

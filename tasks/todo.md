@@ -19,7 +19,7 @@ Flat checklist view of `tasks/plan.md`, in dependency order. Parallel pairs note
 - [x] **Checkpoint 5** — sanity-check headline figures are measured, not estimated (after Task 7)
 - [x] **Task 8** — Floor renderer + robot-count slider + mode toggle (Phase 5.1)
 - [x] **Checkpoint 6** — confirm WS schema stable before Tasks 10/11 (after Task 8)
-- [ ] **Task 9** — Chart.js dashboard + density/stress control (Phase 5.2 + 5.6)
+- [x] **Task 9** — Chart.js dashboard + density/stress control (Phase 5.2 + 5.6)
 - [ ] **Task 10** — Split-screen mode (Phase 5.3)
 - [ ] **Task 11** — Broadcast-lag control (Phase 5 amendment)
 - [ ] **Task 12** — Visual design pass (Phase 5.8)

@@ -8,9 +8,13 @@ extend, so keep additions backward-compatible (new keys, not renamed/removed one
     {"type": "tick", "tick": int, "grid_size": int, "mode": "naive" | "warden",
      "robot_count": int,
      "robots": [{"id": int, "x": int, "y": int, "dx": int, "dy": int}, ...],
-     "stats": {"instant_moves": int, "confirmed_checks": int, "queue_depth": int,
-               "near_miss_count_total": int}}
-     (instant_moves is always 0 in naive mode — every move is a confirmed check there)
+     "stats": {"instant_moves": int, "confirmed_checks": int, "conflicts_avoided": int,
+               "queue_depth": int, "near_miss_count_total": int},
+     "totals": {"instant_moves": int, "confirmed_checks": int, "conflicts_avoided": int}}
+     (instant_moves is always 0 in naive mode — every move is a confirmed check there.
+     "totals" are cumulative since the current mode was selected — a mode switch resets
+     them, since it's a fresh coordinator; a robot-count/grid-size change does not,
+     except grid-size also resets the world itself, per set_grid_size below.)
 
 Control messages (client -> server), one JSON object per WS text frame:
 
@@ -51,6 +55,7 @@ class SimulationServer:
         self.mode = "warden"
         self.clients: set = set()
         self.sim = self._new_simulator()
+        self.totals = {"instant_moves": 0, "confirmed_checks": 0, "conflicts_avoided": 0}
 
     def _new_simulator(self) -> Simulator:
         return Simulator(
@@ -69,6 +74,7 @@ class SimulationServer:
         if mode not in ("naive", "warden") or mode == self.mode:
             return
         self.mode = mode
+        self.totals = {"instant_moves": 0, "confirmed_checks": 0, "conflicts_avoided": 0}
         robot_count = len(self.sim.world.robots)
         if mode == "naive":
             self.sim.coordinator = Coordinator(
@@ -87,6 +93,7 @@ class SimulationServer:
             return
         self.grid_size = size
         self.sim = self._new_simulator()
+        self.totals = {"instant_moves": 0, "confirmed_checks": 0, "conflicts_avoided": 0}
 
     def set_robot_count(self, count: int) -> None:
         count = max(MIN_ROBOT_COUNT, min(MAX_ROBOT_COUNT, count))
@@ -111,17 +118,23 @@ class SimulationServer:
             for robot in world.robots
         ]
 
-        stats = {"instant_moves": 0, "confirmed_checks": 0, "queue_depth": 0}
+        stats = {"instant_moves": 0, "confirmed_checks": 0, "conflicts_avoided": 0, "queue_depth": 0}
         if self.sim.coordinator is not None:
             entry = self.sim.coordinator.log[-1]
             if self.mode == "naive":
                 stats["confirmed_checks"] = entry["confirm_checks"]
+                stats["conflicts_avoided"] = entry["conflicts_avoided"]
                 stats["queue_depth"] = entry["queue_depth"]
             else:
                 stats["instant_moves"] = entry["instant_moves"]
                 stats["confirmed_checks"] = entry["confirmed_checks"]
+                stats["conflicts_avoided"] = entry["conflicts_avoided"]
                 stats["queue_depth"] = self.sim.coordinator.confirm_check_log[-1]["queue_depth"]
         stats["near_miss_count_total"] = world.near_miss_count
+
+        self.totals["instant_moves"] += stats["instant_moves"]
+        self.totals["confirmed_checks"] += stats["confirmed_checks"]
+        self.totals["conflicts_avoided"] += stats["conflicts_avoided"]
 
         return {
             "type": "tick",
@@ -131,6 +144,7 @@ class SimulationServer:
             "robot_count": len(world.robots),
             "robots": robots,
             "stats": stats,
+            "totals": dict(self.totals),
         }
 
     def handle_control_message(self, raw_message: str) -> None:

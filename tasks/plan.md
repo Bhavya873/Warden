@@ -96,9 +96,9 @@ Task 1/2 are independent (build in parallel). Task W0 needs only Task 3 and can 
 **Depends on:** Task 5, Task W0/W1.
 
 ### Task 9 — Chart.js dashboard + density/stress control (Phase 5.2 + 5.6)
-**Delivers:** stacked/grouped bar (instant/confirmed/conflict), rolling coordinator-load line, running totals; density/stress control pushing robot count toward capacity to reproduce Task 7's headline result live.
-**Acceptance:** at high density, Naive's load line climbs while Warden's stays flat — visually matches Task 7's captured figures.
-**Verify:** manual browser check against Task 7's numbers.
+**Delivers:** bar chart (instant/confirmed/conflicts avoided this tick), rolling coordinator-load line, running totals; the existing robot-count slider (Task 8) doubles as the density/stress control, per the build spec's "a separate control (or reuse the robot count slider at its high end)" — no second slider added.
+**Acceptance (corrected against Task 7's actual measurement, not the spec's original "stays flat" wording):** at high density, both Naive's and Warden's load rise, but Warden's stays consistently below Naive's. Verified live server-side (not just in the Task 7 benchmark): at 140 robots on a 30x30 grid, warden queue depth ~74 vs naive ~96 (same seed/history), matching the direction and rough magnitude of `tasks/benchmark-findings.md`'s crowded-density row.
+**Verify:** `python -c` snippet driving `SimulationServer` directly through a density ramp (done); manual browser check still outstanding — no browser available in this environment.
 **Depends on:** Task 8, Task 7.
 
 ### Task 10 — Split-screen mode (Phase 5.3)

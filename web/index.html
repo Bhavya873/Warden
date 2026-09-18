@@ -18,22 +18,47 @@
         </select>
       </div>
       <div class="control">
-        <label for="robot-count">Robots: <span id="robot-count-value">20</span></label>
+        <label for="robot-count">
+          Robots: <span id="robot-count-value">20</span>
+          <span class="hint">(drag to the high end for a density stress test)</span>
+        </label>
         <input id="robot-count" type="range" min="1" max="150" value="20" />
       </div>
       <div class="control">
         <label for="grid-size">Grid size: <span id="grid-size-value">30</span></label>
         <input id="grid-size" type="range" min="10" max="40" value="30" />
       </div>
-      <dl class="stats">
-        <dt>Tick</dt><dd id="stat-tick">0</dd>
-        <dt>Instant moves</dt><dd id="stat-instant">0</dd>
-        <dt>Confirmed checks</dt><dd id="stat-confirmed">0</dd>
-        <dt>Queue depth</dt><dd id="stat-queue">0</dd>
-      </dl>
-      <p id="connection-status">connecting&hellip;</p>
+      <p id="connection-status"><span id="connection-text">connecting&hellip;</span> <span id="stat-tick"></span></p>
     </div>
   </div>
+
+  <div class="dashboard">
+    <dl class="totals">
+      <div class="total">
+        <dt>Total moves</dt>
+        <dd id="total-moves">0</dd>
+      </div>
+      <div class="total">
+        <dt>Total confirm-checks</dt>
+        <dd id="total-confirmed">0</dd>
+      </div>
+      <div class="total">
+        <dt>Total conflicts avoided</dt>
+        <dd id="total-conflicts">0</dd>
+      </div>
+    </dl>
+
+    <div class="charts">
+      <div class="chart-box">
+        <canvas id="mix-chart"></canvas>
+      </div>
+      <div class="chart-box">
+        <canvas id="load-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="grid_view.js"></script>
 </body>
 </html>

@@ -1,9 +1,10 @@
-/* Warden — dark fleet-operations console, built on a shadcn-style token system
-   (background/foreground/card/border/primary/secondary/muted/destructive/ring) so every
-   surface on the page — the floor canvases, the control groups, the stat tiles, the
-   chart panels — uses the exact same component recipe instead of one-off styling.
-   Saturated color is reserved for the move-outcome legend (green/amber/red/violet);
-   everything else stays on the neutral scale so status reads unambiguously against it. */
+/* Warden — dark fleet-operations console with a "liquid glass" material for every piece
+   of chrome (panels, buttons, the select, the dashboard): translucent, blurred surfaces
+   with a soft top-edge highlight, over two very faint color blooms in the page
+   background so there's something for the blur to actually pick up. The floor canvases
+   stay solid/opaque — they're the instrument being read, not chrome, so they're the one
+   surface deliberately NOT glass. Saturated color is reserved for the move-outcome
+   legend and the two board accents; everything else stays neutral. */
 
 :root {
   --background: #0a0d13;
@@ -36,7 +37,15 @@
   --status-conflict: #f87171;
   --status-near-miss: #c084fc;
 
-  --radius: 0.5rem;
+  --radius: 0.75rem;
+
+  /* The glass material: translucent fill + blur + a bright inset top edge (the
+     "specular highlight" that reads as light catching a curved glass surface). */
+  --glass-fill: rgba(18, 22, 31, 0.55);
+  --glass-fill-strong: rgba(18, 22, 31, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --glass-blur: blur(20px) saturate(160%);
 
   --font-sans: "IBM Plex Sans", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -48,11 +57,16 @@
 
 body {
   font-family: var(--font-sans);
-  background: var(--background);
   color: var(--foreground);
   margin: 0 auto;
   max-width: 1400px;
   padding: 32px clamp(16px, 4vw, 48px) 64px;
+  /* Two faint, fixed color blooms — not decoration for its own sake, but the thing the
+     glass panels' backdrop-filter needs behind it to actually have something to blur and
+     tint. Kept low-alpha enough to be invisible except through the glass. */
+  background: radial-gradient(ellipse 900px 600px at 10% -10%, rgba(91, 140, 255, 0.14), transparent 60%),
+    radial-gradient(ellipse 700px 600px at 100% 15%, rgba(232, 147, 92, 0.11), transparent 60%), var(--background);
+  background-attachment: fixed;
 }
 
 .mono {
@@ -60,14 +74,17 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* --- Component: panel (shadcn "Card" equivalent) — the one recipe every surface
-   on the page uses: floor canvases, control groups, stat tiles, chart panels. ------- */
+/* --- Component: panel — glass card, the one recipe every piece of chrome on the page
+   uses: control groups, stat panels, the dashboard. ------------------------------- */
 
 .panel {
-  background: var(--card);
-  border: 1px solid var(--border);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   padding: 20px;
+  box-shadow: var(--glass-highlight), 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 .panel-title {
@@ -100,26 +117,30 @@ body {
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
 .btn-primary {
-  background: var(--primary);
+  background: rgba(91, 140, 255, 0.82);
   color: var(--primary-foreground);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 4px 14px rgba(91, 140, 255, 0.25);
 }
 
 .btn-primary:hover {
-  background: var(--primary-hover);
+  background: rgba(91, 140, 255, 0.95);
 }
 
 .btn-outline {
-  background: transparent;
+  background: var(--glass-fill);
   color: var(--foreground);
-  border-color: var(--border);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-highlight);
 }
 
 .btn-outline:hover {
-  background: var(--secondary);
+  background: rgba(26, 32, 48, 0.75);
 }
 
 .btn:focus-visible {
@@ -151,8 +172,6 @@ body {
 }
 
 .abstract {
-  /* Spans the full header width (not a narrow column) — the page's own max-width
-     already keeps line length reasonable on wide screens. */
   margin: 12px 0 0;
   color: var(--muted-foreground);
   font-size: 0.88rem;
@@ -222,6 +241,10 @@ body {
   gap: 16px;
 }
 
+/* Deliberately NOT glass: the grid is the instrument being read, redrawn every tick —
+   it needs a solid, unambiguous backdrop for the robots to read clearly against, not a
+   translucent one showing color blooms through it. This is the one surface glass would
+   actively hurt legibility on. */
 .split-floor canvas {
   display: block;
   width: 100%;
@@ -358,12 +381,15 @@ select {
   display: block;
   width: 100%;
   height: 36px;
-  border: 1px solid var(--input);
-  background: var(--background);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-fill-strong);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: var(--foreground);
   padding: 0 12px;
   border-radius: var(--radius);
   font-size: 0.875rem;
+  box-shadow: var(--glass-highlight);
   transition: border-color 120ms ease;
 }
 
@@ -417,54 +443,89 @@ input[type="range"]:focus-visible {
 }
 
 /* --- Dashboard ------------------------------------------------------------ */
+/* One glass panel: a scannable comparison table (the point-in-time numbers) plus a
+   single unobtrusive trend sparkline — not a wall of separate stat tiles and full
+   charts. Four rows is the whole point: everything on here earns its place. */
 
 .dashboard {
   margin-top: 48px;
 }
 
-.totals-split {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-  margin-bottom: 24px;
+.compare {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-.totals-column {
-  flex: 1 1 280px;
+.compare th,
+.compare td {
+  padding: 12px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
 }
 
-.totals {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px 24px;
-  margin: 0;
-  padding: 0;
-}
-
-.total dt {
-  font-size: 0.75rem;
+.compare thead th {
+  padding-top: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
   color: var(--muted-foreground);
-  margin: 0 0 4px;
 }
 
-.total dd {
-  margin: 0;
-  font-size: 1.5rem;
+.compare thead th:first-child {
+  text-align: left;
+}
+
+.compare thead .dot {
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.compare tbody th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  cursor: help; /* every row label carries a title= explainer */
+}
+
+.compare tbody td {
+  font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: -0.01em;
+  width: 140px;
 }
 
-.total-near-miss dd {
-  color: var(--status-near-miss);
+.compare tbody tr:last-child th,
+.compare tbody tr:last-child td {
+  border-bottom: none;
 }
 
-.charts {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
+.request-pct {
+  display: block;
+  font-size: 1.25rem;
 }
 
-.chart-box {
-  flex: 1 1 380px;
-  height: 280px;
+.request-bar {
+  margin-top: 6px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.request-bar-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 999px;
+  transition: width 200ms ease;
+}
+
+.sparkline-label {
+  margin: 20px 0 8px;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.sparkline-wrap {
+  position: relative;
+  height: 64px;
 }

@@ -45,6 +45,26 @@ def test_no_collisions_over_many_ticks():
     assert len(set(positions)) == len(positions)
 
 
+def test_no_permanent_gridlock():
+    # Regression test: plain greedy single-axis movement (no anti-deadlock fallback)
+    # settles into a permanent, whole-fleet circular-wait deadlock on this exact
+    # scenario — 10 robots on a 30x30 grid were fully frozen (0 moves/tick) by tick
+    # ~700 and never recovered. The axis-flip / random-escape fallback in
+    # GridWorld._preferred_step exists specifically to prevent this.
+    world = GridWorld(grid_size=30, robot_count=10, seed=42)
+    for _ in range(3000):
+        world.tick()
+
+    moves_in_final_window = 0
+    for _ in range(200):
+        before = _positions(world)
+        world.tick()
+        after = _positions(world)
+        moves_in_final_window += sum(1 for a, b in zip(before, after) if a != b)
+
+    assert moves_in_final_window > 0, "fleet is permanently gridlocked"
+
+
 def test_target_reassignment_keeps_robots_moving_toward_new_targets():
     world = GridWorld(grid_size=10, robot_count=1, seed=1)
     robot = world.robots[0]

@@ -10,3 +10,6 @@ class Robot:
     y: int
     target_x: int
     target_y: int
+    # consecutive ticks with no move — grid_world uses this to break deadlocks (see
+    # GridWorld._preferred_step)
+    consecutive_blocked_ticks: int = 0

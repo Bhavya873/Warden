@@ -12,6 +12,17 @@ from core.robot import Robot
 
 Cell = tuple[int, int]
 
+# Escalating anti-deadlock thresholds. Set comfortably above the naive/Warden
+# coordinator's max confirm-check delay (3 ticks) so ordinary network wait never
+# triggers escalation — only genuine sustained contention does. Without this, greedy
+# single-axis movement settles into a permanent, whole-fleet circular-wait deadlock
+# (observed: 10 robots on a 30x30 grid, fully frozen by tick ~700, forever; the axis
+# flip alone delays but doesn't prevent it — gridlock still creeps in by tick ~2500).
+# This isn't a coordination-layer problem — it reproduces with no policy at all — so
+# the fix lives here in ground-truth movement, not in Naive/Warden.
+AXIS_FLIP_THRESHOLD_TICKS = 6
+RANDOM_ESCAPE_THRESHOLD_TICKS = 15
+
 
 class CollisionError(RuntimeError):
     """Two robots ended up occupying the same cell. Must never happen — see build spec §7."""
@@ -47,15 +58,39 @@ class GridWorld:
             target_x, target_y = self._random_target(exclude=(x, y))
             self.robots.append(Robot(robot_id, x, y, target_x, target_y))
 
-    def _greedy_step(self, robot: Robot) -> Cell:
-        """One cell closer to target, reducing whichever of dx/dy is larger first."""
+    def _preferred_step(self, robot: Robot) -> Cell:
+        """One cell closer to target (larger of dx/dy first); once blocked
+        AXIS_FLIP_THRESHOLD_TICKS ticks in a row, the *other* axis instead; once blocked
+        RANDOM_ESCAPE_THRESHOLD_TICKS ticks in a row, a random adjacent cell regardless
+        of target direction — escalating anti-deadlock fallbacks."""
         dx = robot.target_x - robot.x
         dy = robot.target_y - robot.y
         if dx == 0 and dy == 0:
             return (robot.x, robot.y)
-        if abs(dx) >= abs(dy):
+
+        if robot.consecutive_blocked_ticks >= RANDOM_ESCAPE_THRESHOLD_TICKS:
+            return self._random_escape_step(robot)
+
+        prefer_x = abs(dx) >= abs(dy)
+        if robot.consecutive_blocked_ticks >= AXIS_FLIP_THRESHOLD_TICKS:
+            prefer_x = not prefer_x
+
+        if prefer_x and dx != 0:
+            return (robot.x + (1 if dx > 0 else -1), robot.y)
+        if not prefer_x and dy != 0:
+            return (robot.x, robot.y + (1 if dy > 0 else -1))
+        # preferred axis has no delta to close — fall back to whichever axis does
+        if dx != 0:
             return (robot.x + (1 if dx > 0 else -1), robot.y)
         return (robot.x, robot.y + (1 if dy > 0 else -1))
+
+    def _random_escape_step(self, robot: Robot) -> Cell:
+        candidates = [
+            (robot.x + dx, robot.y + dy)
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
+            if 0 <= robot.x + dx < self.grid_size and 0 <= robot.y + dy < self.grid_size
+        ]
+        return self._rng.choice(candidates)
 
     def tick(self, policy=None) -> None:
         """`policy`, if given, gates each move attempt via `policy.can_move(robot,
@@ -66,17 +101,21 @@ class GridWorld:
         """
         self.tick_count += 1
         for robot in self.robots:  # fixed order: ascending robot_id (spawn order)
-            next_cell = self._greedy_step(robot)
+            next_cell = self._preferred_step(robot)
             if next_cell == (robot.x, robot.y):
+                robot.consecutive_blocked_ticks = 0
                 continue
             if policy is not None and not policy.can_move(robot, next_cell):
+                robot.consecutive_blocked_ticks += 1
                 continue  # waiting on the policy (e.g. an in-flight confirm-check)
             if next_cell in self._occupied:
+                robot.consecutive_blocked_ticks += 1
                 continue  # blocked this tick — try again next tick
 
             del self._occupied[(robot.x, robot.y)]
             robot.x, robot.y = next_cell
             self._occupied[next_cell] = robot.robot_id
+            robot.consecutive_blocked_ticks = 0
 
             if (robot.x, robot.y) == (robot.target_x, robot.target_y):
                 robot.target_x, robot.target_y = self._random_target(exclude=(robot.x, robot.y))

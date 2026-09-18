@@ -1,9 +1,9 @@
 """Drives a GridWorld's tick loop, optionally routing every move through a Coordinator
-(naive mode, Phase 2). Task 5 adds Warden mode (Ribbon-filter-gated) alongside it —
-`naive_mode` anticipates the same flag name `scenarios.py` uses in Phase 4.
+(naive mode, Phase 2) or a WardenCoordinator (Warden mode, Phase 3). `naive_mode` and
+`warden_mode` anticipate the flag names `scenarios.py` uses in Phase 4.
 """
 
-from core.coordinator import Coordinator
+from core.coordinator import Coordinator, WardenCoordinator
 from core.grid_world import GridWorld
 
 
@@ -14,9 +14,18 @@ class Simulator:
         robot_count: int = 10,
         seed: int = 0,
         naive_mode: bool = False,
+        warden_mode: bool = False,
     ):
+        if naive_mode and warden_mode:
+            raise ValueError("choose one of naive_mode or warden_mode, not both")
+
         self.world = GridWorld(grid_size=grid_size, robot_count=robot_count, seed=seed)
-        self.coordinator = Coordinator(robot_count=robot_count, seed=seed) if naive_mode else None
+        if warden_mode:
+            self.coordinator = WardenCoordinator(robot_count=robot_count, seed=seed)
+        elif naive_mode:
+            self.coordinator = Coordinator(robot_count=robot_count, seed=seed)
+        else:
+            self.coordinator = None
 
     def run(self, ticks: int) -> None:
         for _ in range(ticks):

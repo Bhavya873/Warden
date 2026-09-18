@@ -46,6 +46,12 @@ class Coordinator:
         self._checks_this_tick = 0
         self.log: list[dict] = []
 
+    def claimed_cells(self) -> list[Cell]:
+        """The coordinator's broadcast: currently-claimed cells per the ring buffer, as
+        of the last `tick()` sync. Warden mode's robots rebuild their local filter from
+        this (build spec §6 Phase 3 step 2)."""
+        return self._ring_buffer.claimed_cells()
+
     def can_move(self, robot, next_cell: Cell) -> bool:
         outstanding = self._outstanding_by_robot.get(robot.robot_id)
 
@@ -100,3 +106,67 @@ class Coordinator:
             }
         )
         self._checks_this_tick = 0
+
+
+DEFAULT_FILTER_REFRESH_INTERVAL_TICKS = 5
+DEFAULT_FILTER_TARGET_FPR = 0.01
+
+
+class WardenCoordinator:
+    """Warden mode (Phase 3): each robot checks its local Ribbon filter first.
+    "Definitely free" -> instant move, no coordinator call. "Maybe claimed" -> falls
+    back to the exact same confirm-check round trip as naive mode, via a wrapped
+    Coordinator instance — reusing Task 4's tested logic rather than duplicating it.
+
+    # ponytail: one shared filter object stands in for every robot's own identical
+    # copy, since every robot receives the same broadcast at the same refresh tick in
+    # this simulation (no per-robot broadcast latency/loss modeled). Switch to
+    # per-robot filter instances if that ever changes.
+    """
+
+    def __init__(
+        self,
+        robot_count: int,
+        seed: int = 0,
+        min_delay_ticks: int = 1,
+        max_delay_ticks: int = 3,
+        claim_ttl_ticks: int = 2,
+        filter_refresh_interval_ticks: int = DEFAULT_FILTER_REFRESH_INTERVAL_TICKS,
+        filter_target_fpr: float = DEFAULT_FILTER_TARGET_FPR,
+    ):
+        self._coordinator = Coordinator(
+            robot_count=robot_count,
+            seed=seed,
+            min_delay_ticks=min_delay_ticks,
+            max_delay_ticks=max_delay_ticks,
+            claim_ttl_ticks=claim_ttl_ticks,
+        )
+        self.filter_refresh_interval_ticks = filter_refresh_interval_ticks
+        self.filter_target_fpr = filter_target_fpr
+
+        self._filter = None
+        self.instant_moves_this_tick = 0
+        self.log: list[dict] = []
+
+    def can_move(self, robot, next_cell: Cell) -> bool:
+        if not self._filter.contains(next_cell):
+            self.instant_moves_this_tick += 1
+            return True  # definitely free — no coordinator call
+        return self._coordinator.can_move(robot, next_cell)  # maybe claimed — confirm
+
+    def tick(self, current_tick: int, occupied_cells: dict[Cell, int]) -> None:
+        self._coordinator.tick(current_tick, occupied_cells)
+
+        due_for_refresh = self._filter is None or current_tick % self.filter_refresh_interval_ticks == 0
+        if due_for_refresh:
+            self._filter = warden_core.RibbonFilter(self._coordinator.claimed_cells(), self.filter_target_fpr)
+
+        self.log.append(
+            {
+                "tick": current_tick,
+                "instant_moves": self.instant_moves_this_tick,
+                "confirmed_checks": self._coordinator.log[-1]["confirm_checks"],
+                "filter_refreshed": due_for_refresh,
+            }
+        )
+        self.instant_moves_this_tick = 0

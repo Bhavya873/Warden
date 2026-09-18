@@ -23,14 +23,27 @@
       </div>
     </div>
     <p class="abstract">
-      Collision-free zone claiming for a warehouse robot fleet: instead of asking a server before every
-      move, each robot checks a local Ribbon filter first, and only falls back to an exact check against
-      the server's ring buffer when the filter reports a cell as possibly claimed — the same
-      fast-reject-then-confirm pattern used in network duplicate-detection systems, applied here to
-      spatial coordination. The same idea generalizes to any system where a cheap approximate check can
-      absorb most traffic and escalate only genuine conflicts to an expensive, exact one. Built with a
-      Rust core (PyO3) for the filter and ring buffer, a Python simulation, and this live WebSocket
-      dashboard comparing it against an always-ask baseline.
+      Warden solves a real problem in warehouse robotics. How do you stop robots from running into each
+      other without making every single move check in with a server first? Most of the time nothing is
+      in the way, so most of those checks are wasted overhead.
+    </p>
+    <p class="abstract">
+      Warden gives each robot a small local Ribbon filter that can instantly say that a cell is free with
+      certainty, or that it might be occupied when it is not sure. Only the uncertain cases get sent back
+      to the server, which keeps the real authoritative record in a ring buffer. This is the same trick
+      networks use to catch duplicate packets. Reject the easy cases fast, and only pay for an exact
+      answer when there is genuine ambiguity.
+    </p>
+    <p class="abstract">
+      The pattern generalizes well beyond robots. Rate limiters, cache lookups, and any deduplication
+      system where most checks come back negative and a wrong negative is rare enough to double check can
+      benefit from the same approach.
+    </p>
+    <p class="abstract">
+      The filter and ring buffer are written in Rust and exposed to Python through PyO3, so the
+      performance critical part stays fast while the simulation logic stays easy to iterate on. A live
+      WebSocket dashboard runs Warden side by side against a naive always ask baseline, so the payoff is
+      something you watch happen rather than a number you have to take on faith.
     </p>
   </header>
 

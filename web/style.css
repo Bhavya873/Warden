@@ -47,7 +47,10 @@
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.14);
   --glass-blur: blur(20px) saturate(160%);
 
-  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  /* Source Sans 3: Adobe's enterprise/UI workhorse — a more neutral, business-document
+     register than IBM Plex's distinctive geometric quirks. IBM Plex Mono stays for
+     numeric readouts, unchanged: it already reads clean and technical. */
+  --font-sans: "Source Sans 3", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 

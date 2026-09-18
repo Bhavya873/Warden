@@ -17,15 +17,17 @@ def test_step_and_serialize_shape():
     assert state["mode"] in ("naive", "warden")
     assert len(state["robots"]) == state["robot_count"]
     for robot in state["robots"]:
-        assert set(robot) == {"id", "x", "y", "dx", "dy"}
+        assert set(robot) == {"id", "x", "y", "dx", "dy", "near_miss"}
     assert set(state["stats"]) == {
         "queue_depth",
         "instant_moves",
         "confirmed_checks",
         "conflicts_avoided",
+        "near_misses",
         "near_miss_count_total",
     }
-    assert set(state["totals"]) == {"instant_moves", "confirmed_checks", "conflicts_avoided"}
+    assert set(state["totals"]) == {"instant_moves", "confirmed_checks", "conflicts_avoided", "near_misses"}
+    assert state["broadcast_lag"] == "normal"
 
 
 def test_step_and_serialize_runs_cleanly_over_many_ticks():
@@ -61,7 +63,7 @@ def test_totals_accumulate_and_reset_on_mode_switch():
     assert totals_before_switch == server.totals
 
     server.set_mode("naive" if server.mode == "warden" else "warden")
-    assert server.totals == {"instant_moves": 0, "confirmed_checks": 0, "conflicts_avoided": 0}
+    assert server.totals == {"instant_moves": 0, "confirmed_checks": 0, "conflicts_avoided": 0, "near_misses": 0}
 
     state = server.step_and_serialize()
     # totals resumed accumulating from zero in the new mode: after exactly one tick,
@@ -69,6 +71,7 @@ def test_totals_accumulate_and_reset_on_mode_switch():
     assert state["totals"]["instant_moves"] == state["stats"]["instant_moves"]
     assert state["totals"]["confirmed_checks"] == state["stats"]["confirmed_checks"]
     assert state["totals"]["conflicts_avoided"] == state["stats"]["conflicts_avoided"]
+    assert state["totals"]["near_misses"] == state["stats"]["near_misses"]
 
 
 def test_set_robot_count_add_and_remove():
@@ -107,6 +110,7 @@ def test_split_mode_shape():
     assert state["type"] == "tick_split"
     assert state["mode"] == "split"
     assert set(state["boards"]) == {"naive", "warden"}
+    assert state["broadcast_lag"] == "normal"
     for label, board in state["boards"].items():
         assert set(board) == {"tick", "robot_count", "robots", "stats", "totals"}
         assert len(board["robots"]) == board["robot_count"]
@@ -115,6 +119,7 @@ def test_split_mode_shape():
             "instant_moves",
             "confirmed_checks",
             "conflicts_avoided",
+            "near_misses",
             "near_miss_count_total",
         }
 
@@ -165,6 +170,53 @@ def test_set_robot_count_applies_to_both_boards_in_split_mode():
     server.set_robot_count(40)
     assert len(server.split_sims["naive"].world.robots) == 40
     assert len(server.split_sims["warden"].world.robots) == 40
+
+
+def test_set_broadcast_lag_is_live_and_has_no_effect_in_naive_mode():
+    server = SimulationServer()  # starts in warden mode
+    assert isinstance(server.sim.coordinator.filter_refresh_interval_ticks, int)
+    default_interval = server.sim.coordinator.filter_refresh_interval_ticks
+
+    server.set_broadcast_lag("adversarial")
+    assert server.broadcast_lag_level == "adversarial"
+    assert server.sim.coordinator.filter_refresh_interval_ticks == 1_000_000
+    assert server.sim.coordinator.filter_refresh_interval_ticks != default_interval
+
+    # switching to naive mode: no filter to apply it to, but the preference persists
+    server.set_mode("naive")
+    assert server.broadcast_lag_level == "adversarial"
+    assert not hasattr(server.sim.coordinator, "filter_refresh_interval_ticks")
+
+    # switching back to warden: the standing preference is reapplied to the fresh coordinator
+    server.set_mode("warden")
+    assert server.sim.coordinator.filter_refresh_interval_ticks == 1_000_000
+
+
+def test_broadcast_lag_applies_to_warden_board_in_split_mode():
+    server = SimulationServer()
+    server.set_mode("split")
+    server.set_broadcast_lag("degraded")
+
+    assert server.split_sims["warden"].coordinator.filter_refresh_interval_ticks == 30
+    assert not hasattr(server.split_sims["naive"].coordinator, "filter_refresh_interval_ticks")
+
+
+def test_near_miss_rate_rises_with_broadcast_lag():
+    # Cross-checks the live server against tasks/staleness-finding.md's offline finding:
+    # near-miss frequency should rise as broadcast lag worsens, not stay flat or drop.
+    def near_miss_rate(level: str) -> float:
+        server = SimulationServer()
+        server.set_robot_count(50)
+        server.set_broadcast_lag(level)
+        total_attempts = 0
+        total_near_misses = 0
+        for _ in range(1500):
+            state = server.step_and_serialize()
+            total_attempts += state["stats"]["instant_moves"] + state["stats"]["confirmed_checks"]
+            total_near_misses += state["stats"]["near_misses"]
+        return total_near_misses / total_attempts
+
+    assert near_miss_rate("normal") < near_miss_rate("adversarial")
 
 
 def test_server_end_to_end_over_real_websocket():

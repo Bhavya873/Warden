@@ -46,3 +46,23 @@ def test_staleness_actually_produces_near_misses():
         f"expected heavy near-miss traffic under a never-refreshing filter, "
         f"got {world.near_miss_count} near-misses out of {total_attempts} attempts"
     )
+
+
+def test_near_miss_robot_ids_track_the_current_tick_only():
+    # Task 11's live marker needs to know *which* robots had a near-miss on the tick
+    # just completed, not just a cumulative count — this is reset every tick, not
+    # accumulated, unlike near_miss_count.
+    grid_size, robot_count, seed = 30, 50, 7
+    world = GridWorld(grid_size=grid_size, robot_count=robot_count, seed=seed)
+    wc = WardenCoordinator(robot_count=robot_count, seed=seed, filter_refresh_interval_ticks=NEVER_REFRESH)
+
+    saw_a_near_miss_tick = False
+    for t in range(1, 501):
+        wc.tick(t, world.occupied_cells())
+        world.tick(policy=wc)
+        if world.near_miss_robot_ids:
+            saw_a_near_miss_tick = True
+            assert all(0 <= rid < robot_count for rid in world.near_miss_robot_ids)
+            assert len(world.near_miss_robot_ids) == len(set(world.near_miss_robot_ids))  # no duplicates
+
+    assert saw_a_near_miss_tick, "expected at least one tick with a near-miss over 500 ticks at this setting"

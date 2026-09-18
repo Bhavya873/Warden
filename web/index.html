@@ -41,6 +41,17 @@
         <label for="grid-size">Grid size: <span id="grid-size-value">30</span></label>
         <input id="grid-size" type="range" min="10" max="40" value="30" />
       </div>
+      <div class="control">
+        <label for="broadcast-lag">
+          Broadcast lag
+          <span class="hint">(Warden filter refresh interval — no effect in Naive mode)</span>
+        </label>
+        <select id="broadcast-lag">
+          <option value="normal">Normal</option>
+          <option value="degraded">Degraded</option>
+          <option value="adversarial">Adversarial</option>
+        </select>
+      </div>
       <p id="connection-status"><span id="connection-text">connecting&hellip;</span> <span id="stat-tick"></span></p>
     </div>
   </div>
@@ -59,6 +70,10 @@
         <dt>Total conflicts avoided</dt>
         <dd id="total-conflicts">0</dd>
       </div>
+      <div class="total total-near-miss">
+        <dt>Total near-misses</dt>
+        <dd id="total-near-misses">0</dd>
+      </div>
     </dl>
 
     <div class="totals-split" id="totals-split">
@@ -68,6 +83,7 @@
           <div class="total"><dt>Moves</dt><dd id="split-naive-total-moves">0</dd></div>
           <div class="total"><dt>Confirmed</dt><dd id="split-naive-total-confirmed">0</dd></div>
           <div class="total"><dt>Conflicts avoided</dt><dd id="split-naive-total-conflicts">0</dd></div>
+          <div class="total total-near-miss"><dt>Near-misses</dt><dd id="split-naive-total-near-misses">0</dd></div>
         </dl>
       </div>
       <div class="totals-column">
@@ -76,6 +92,7 @@
           <div class="total"><dt>Moves</dt><dd id="split-warden-total-moves">0</dd></div>
           <div class="total"><dt>Confirmed</dt><dd id="split-warden-total-confirmed">0</dd></div>
           <div class="total"><dt>Conflicts avoided</dt><dd id="split-warden-total-conflicts">0</dd></div>
+          <div class="total total-near-miss"><dt>Near-misses</dt><dd id="split-warden-total-near-misses">0</dd></div>
         </dl>
       </div>
     </div>

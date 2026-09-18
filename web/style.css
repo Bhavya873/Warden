@@ -121,6 +121,12 @@ h1 {
   font-weight: 700;
 }
 
+/* Near-misses get their own color — not red, so they read as distinct from a caught
+   conflict (see tasks/staleness-finding.md's near-miss definition). */
+.total-near-miss dd {
+  color: #9b3fd6;
+}
+
 .charts {
   display: flex;
   gap: 24px;

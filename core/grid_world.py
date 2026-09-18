@@ -43,6 +43,11 @@ class GridWorld:
         # spec §6 Phase 3 step 6's adversarial staleness test — see tests/test_staleness.py
         # and tasks/staleness-finding.md.
         self.near_miss_count = 0
+        # robot_ids that had a near-miss on the tick just completed — for Task 11's
+        # broadcast-lag control to mark them distinctly (not red — see
+        # tasks/staleness-finding.md's near-miss definition) instead of only reporting
+        # a cumulative count.
+        self.near_miss_robot_ids: list[int] = []
         self._spawn_robots()
         self._next_robot_id = self.robot_count
 
@@ -107,6 +112,7 @@ class GridWorld:
         final authority — a policy's answer can be stale by the time a move is attempted.
         """
         self.tick_count += 1
+        self.near_miss_robot_ids = []
         for robot in self.robots:  # fixed order: ascending robot_id (spawn order)
             next_cell = self._preferred_step(robot)
             if next_cell == (robot.x, robot.y):
@@ -119,6 +125,7 @@ class GridWorld:
                 robot.consecutive_blocked_ticks += 1
                 if policy is not None:
                     self.near_miss_count += 1  # policy approved this move; ground truth didn't
+                    self.near_miss_robot_ids.append(robot.robot_id)
                 continue  # blocked this tick — try again next tick
 
             del self._occupied[(robot.x, robot.y)]

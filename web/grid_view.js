@@ -19,6 +19,7 @@ const robotCountInput = document.getElementById("robot-count");
 const robotCountValue = document.getElementById("robot-count-value");
 const gridSizeInput = document.getElementById("grid-size");
 const gridSizeValue = document.getElementById("grid-size-value");
+const broadcastLagSelect = document.getElementById("broadcast-lag");
 const connectionText = document.getElementById("connection-text");
 const statTick = document.getElementById("stat-tick");
 
@@ -26,6 +27,7 @@ const totalsSingle = document.getElementById("totals-single");
 const totalMoves = document.getElementById("total-moves");
 const totalConfirmed = document.getElementById("total-confirmed");
 const totalConflicts = document.getElementById("total-conflicts");
+const totalNearMisses = document.getElementById("total-near-misses");
 
 const totalsSplit = document.getElementById("totals-split");
 const splitTotalEls = {
@@ -33,11 +35,13 @@ const splitTotalEls = {
     moves: document.getElementById("split-naive-total-moves"),
     confirmed: document.getElementById("split-naive-total-confirmed"),
     conflicts: document.getElementById("split-naive-total-conflicts"),
+    nearMisses: document.getElementById("split-naive-total-near-misses"),
   },
   warden: {
     moves: document.getElementById("split-warden-total-moves"),
     confirmed: document.getElementById("split-warden-total-confirmed"),
     conflicts: document.getElementById("split-warden-total-conflicts"),
+    nearMisses: document.getElementById("split-warden-total-near-misses"),
   },
 };
 
@@ -64,12 +68,14 @@ function createSingleCharts() {
   mixChart = new Chart(document.getElementById("mix-chart"), {
     type: "bar",
     data: {
-      labels: ["Instant", "Confirmed", "Conflicts avoided"],
+      labels: ["Instant", "Confirmed", "Conflicts avoided", "Near-misses"],
       datasets: [
         {
           label: "This tick",
-          data: [0, 0, 0],
-          backgroundColor: ["#2fa84f", "#e0b400", "#d64545"],
+          data: [0, 0, 0, 0],
+          // Near-misses use purple, not red — a near-miss is the filter/coordinator
+          // being wrong, not a correctly-caught conflict (tasks/staleness-finding.md).
+          backgroundColor: ["#2fa84f", "#e0b400", "#d64545", "#9b3fd6"],
         },
       ],
     },
@@ -113,10 +119,10 @@ function createSplitCharts() {
   mixChart = new Chart(document.getElementById("mix-chart"), {
     type: "bar",
     data: {
-      labels: ["Instant", "Confirmed", "Conflicts avoided"],
+      labels: ["Instant", "Confirmed", "Conflicts avoided", "Near-misses"],
       datasets: [
-        { label: "Naive", data: [0, 0, 0], backgroundColor: "#e0824a" },
-        { label: "Warden", data: [0, 0, 0], backgroundColor: "#2f6fed" },
+        { label: "Naive", data: [0, 0, 0, 0], backgroundColor: "#e0824a" },
+        { label: "Warden", data: [0, 0, 0, 0], backgroundColor: "#2f6fed" },
       ],
     },
     options: {
@@ -211,7 +217,12 @@ function renderSingle(state) {
 
   drawFloor(floorCtx, floorCanvas, state.grid_size, state.robots);
 
-  mixChart.data.datasets[0].data = [state.stats.instant_moves, state.stats.confirmed_checks, state.stats.conflicts_avoided];
+  mixChart.data.datasets[0].data = [
+    state.stats.instant_moves,
+    state.stats.confirmed_checks,
+    state.stats.conflicts_avoided,
+    state.stats.near_misses,
+  ];
   mixChart.update("none");
   pushRolling(loadChart.data.labels, loadChart.data.datasets[0].data, state.tick, state.stats.queue_depth);
   loadChart.update("none");
@@ -220,8 +231,9 @@ function renderSingle(state) {
   totalMoves.textContent = state.totals.instant_moves + state.totals.confirmed_checks;
   totalConfirmed.textContent = state.totals.confirmed_checks;
   totalConflicts.textContent = state.totals.conflicts_avoided;
+  totalNearMisses.textContent = state.totals.near_misses;
 
-  syncControls(state.mode, state.robot_count, state.grid_size);
+  syncControls(state.mode, state.robot_count, state.grid_size, state.broadcast_lag);
 }
 
 // --- Rendering: split mode ---------------------------------------------
@@ -240,8 +252,18 @@ function renderSplit(state) {
   drawFloor(floorNaiveCtx, floorNaiveCanvas, state.grid_size, naive.robots);
   drawFloor(floorWardenCtx, floorWardenCanvas, state.grid_size, warden.robots);
 
-  mixChart.data.datasets[0].data = [naive.stats.instant_moves, naive.stats.confirmed_checks, naive.stats.conflicts_avoided];
-  mixChart.data.datasets[1].data = [warden.stats.instant_moves, warden.stats.confirmed_checks, warden.stats.conflicts_avoided];
+  mixChart.data.datasets[0].data = [
+    naive.stats.instant_moves,
+    naive.stats.confirmed_checks,
+    naive.stats.conflicts_avoided,
+    naive.stats.near_misses, // always 0 — naive has no filter to go stale
+  ];
+  mixChart.data.datasets[1].data = [
+    warden.stats.instant_moves,
+    warden.stats.confirmed_checks,
+    warden.stats.conflicts_avoided,
+    warden.stats.near_misses,
+  ];
   mixChart.update("none");
 
   pushRolling(loadChart.data.labels, loadChart.data.datasets[0].data, naive.tick, naive.stats.queue_depth);
@@ -257,11 +279,13 @@ function renderSplit(state) {
   splitTotalEls.naive.moves.textContent = naive.totals.instant_moves + naive.totals.confirmed_checks;
   splitTotalEls.naive.confirmed.textContent = naive.totals.confirmed_checks;
   splitTotalEls.naive.conflicts.textContent = naive.totals.conflicts_avoided;
+  splitTotalEls.naive.nearMisses.textContent = naive.totals.near_misses;
   splitTotalEls.warden.moves.textContent = warden.totals.instant_moves + warden.totals.confirmed_checks;
   splitTotalEls.warden.confirmed.textContent = warden.totals.confirmed_checks;
   splitTotalEls.warden.conflicts.textContent = warden.totals.conflicts_avoided;
+  splitTotalEls.warden.nearMisses.textContent = warden.totals.near_misses;
 
-  syncControls("split", naive.robot_count, state.grid_size);
+  syncControls("split", naive.robot_count, state.grid_size, state.broadcast_lag);
 }
 
 // --- Shared floor drawing -------------------------------------------------
@@ -286,14 +310,14 @@ function drawFloor(ctx, canvas, gridSize, robots) {
   }
 
   const radius = cellSize * 0.35;
-  ctx.fillStyle = "#2f6fed";
-  ctx.strokeStyle = "#1a3f99";
-  ctx.lineWidth = 2;
 
   for (const robot of robots) {
     const cx = robot.x * cellSize + cellSize / 2;
     const cy = robot.y * cellSize + cellSize / 2;
 
+    ctx.fillStyle = "#2f6fed";
+    ctx.strokeStyle = "#1a3f99";
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.fill();
@@ -304,12 +328,22 @@ function drawFloor(ctx, canvas, gridSize, robots) {
       ctx.lineTo(cx + robot.dx * radius * 1.6, cy + robot.dy * radius * 1.6);
       ctx.stroke();
     }
+
+    // Near-miss: the filter/coordinator approved this move but ground truth caught it —
+    // a distinct ring, not red, so it isn't mistaken for a caught conflict.
+    if (robot.near_miss) {
+      ctx.strokeStyle = "#9b3fd6";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius * 1.8, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 }
 
 // --- Controls --------------------------------------------------------------
 
-function syncControls(mode, robotCount, gridSize) {
+function syncControls(mode, robotCount, gridSize, broadcastLag) {
   if (modeSelect.value !== mode) {
     modeSelect.value = mode;
   }
@@ -322,6 +356,9 @@ function syncControls(mode, robotCount, gridSize) {
     gridSizeInput.value = gridSize;
     gridSizeValue.textContent = gridSize;
   }
+  if (broadcastLagSelect.value !== broadcastLag) {
+    broadcastLagSelect.value = broadcastLag;
+  }
 }
 
 function send(message) {
@@ -332,6 +369,10 @@ function send(message) {
 
 modeSelect.addEventListener("change", () => {
   send({ action: "set_mode", mode: modeSelect.value });
+});
+
+broadcastLagSelect.addEventListener("change", () => {
+  send({ action: "set_broadcast_lag", level: broadcastLagSelect.value });
 });
 
 const DEBOUNCE_MS = 150;

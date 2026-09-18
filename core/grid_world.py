@@ -57,12 +57,22 @@ class GridWorld:
             return (robot.x + (1 if dx > 0 else -1), robot.y)
         return (robot.x, robot.y + (1 if dy > 0 else -1))
 
-    def tick(self) -> None:
+    def tick(self, policy=None) -> None:
+        """`policy`, if given, gates each move attempt via `policy.can_move(robot,
+        next_cell) -> bool` (Phase 2's coordinator, Phase 3's Ribbon filter — both use
+        the same hook so Naive and Warden modes run identical movement logic on top of
+        it). Regardless of what the policy says, the live occupancy check below is the
+        final authority — a policy's answer can be stale by the time a move is attempted.
+        """
         self.tick_count += 1
         for robot in self.robots:  # fixed order: ascending robot_id (spawn order)
             next_cell = self._greedy_step(robot)
-            if next_cell == (robot.x, robot.y) or next_cell in self._occupied:
-                continue  # already there, or blocked this tick — try again next tick
+            if next_cell == (robot.x, robot.y):
+                continue
+            if policy is not None and not policy.can_move(robot, next_cell):
+                continue  # waiting on the policy (e.g. an in-flight confirm-check)
+            if next_cell in self._occupied:
+                continue  # blocked this tick — try again next tick
 
             del self._occupied[(robot.x, robot.y)]
             robot.x, robot.y = next_cell
@@ -80,3 +90,6 @@ class GridWorld:
 
     def robot_positions(self) -> dict[int, Cell]:
         return {r.robot_id: (r.x, r.y) for r in self.robots}
+
+    def occupied_cells(self) -> dict[Cell, int]:
+        return dict(self._occupied)

@@ -8,7 +8,7 @@ Flat checklist view of `tasks/plan.md`, in dependency order. Parallel pairs note
 - [x] **Task 3** — Grid world + ground-truth collision detection (Phase 1)
 - [ ] **Checkpoint 1** — review PyO3 boundary shape (after Task 0/1/2)
 - [ ] **Checkpoint 2** — confirm Phase 1 ground-truth check is clean (after Task 3)
-- [ ] **Task 4** — Naive coordinator end-to-end (Phase 2)
+- [x] **Task 4** — Naive coordinator end-to-end (Phase 2)
 - [ ] **Task W0** — WS plumbing + bare canvas viewer *(parallel, needs only Task 3)*
 - [ ] **Task W1** — Naive-mode dashboard wiring *(parallel, needs Task 4)*
 - [ ] **Checkpoint 3** — lock logging/metrics schema (after Task 4)

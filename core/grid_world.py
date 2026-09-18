@@ -32,6 +32,15 @@ RANDOM_ESCAPE_THRESHOLD_TICKS = 15
 # robots still cover the whole grid over many hops (a bounded-step random walk).
 TARGET_LOCALITY_DIVISOR = 5
 
+# A plain local random walk fixes the center bias but introduces a different visible
+# clumping: nothing pushes two robots that happen to drift near each other apart again,
+# so local density pockets that form by chance tend to persist for thousands of ticks
+# (measured: median nearest-neighbor distance between robots can shrink over a 5000-tick
+# run instead of holding steady). Sampling several candidate targets and keeping the one
+# farthest from another robot directly counters that — and is itself realistic warehouse
+# behavior (robots heading toward open space rather than each other).
+TARGET_CANDIDATE_COUNT = 4
+
 
 class CollisionError(RuntimeError):
     """Two robots ended up occupying the same cell. Must never happen — see build spec §7."""
@@ -103,12 +112,23 @@ class GridWorld:
             return exclude  # no alternative cell exists
         radius = max(2, self.grid_size // TARGET_LOCALITY_DIVISOR)
         cx, cy = exclude
-        while True:
-            dx = self._rng.randint(-radius, radius)
-            dy = self._rng.randint(-radius, radius)
-            cell = (self._reflect_into_range(cx + dx), self._reflect_into_range(cy + dy))
-            if cell != exclude:
-                return cell
+        candidates = []
+        for _ in range(TARGET_CANDIDATE_COUNT):
+            while True:
+                dx = self._rng.randint(-radius, radius)
+                dy = self._rng.randint(-radius, radius)
+                cell = (self._reflect_into_range(cx + dx), self._reflect_into_range(cy + dy))
+                if cell != exclude:
+                    candidates.append(cell)
+                    break
+        return max(candidates, key=lambda cell: self._distance_to_nearest_robot(cell, exclude))
+
+    def _distance_to_nearest_robot(self, cell: Cell, exclude: Cell) -> int:
+        cx, cy = cell
+        return min(
+            (abs(cx - ox) + abs(cy - oy) for (ox, oy) in self._occupied if (ox, oy) != exclude),
+            default=self.grid_size * 2,  # no other robots on the grid — nothing to avoid
+        )
 
     def _spawn_robots(self) -> None:
         for robot_id in range(self.robot_count):

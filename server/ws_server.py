@@ -15,6 +15,7 @@ Single-board mode ("naive" | "warden") — not used by the shipped frontend, sti
 valid server capability for any other client:
     {"type": "tick", "grid_size": int, "mode": "naive" | "warden",
      "tick": int, "robot_count": int, "broadcast_lag": "normal"|"degraded"|"adversarial",
+     "paused": bool,
      "robots": [{"id": int, "x": int, "y": int, "dx": int, "dy": int, "near_miss": bool,
                  "outcome": "moved" | "waiting" | "conflict" | "idle"}, ...],
      "stats": {"instant_moves": int, "confirmed_checks": int, "conflicts_avoided": int,
@@ -35,7 +36,7 @@ valid server capability for any other client:
 
 Split mode — two independent worlds, same seed, run in lockstep, each mirroring the
 single-mode "board" shape above (tick/robot_count/robots/stats/totals) under its label:
-    {"type": "tick_split", "grid_size": int, "mode": "split",
+    {"type": "tick_split", "grid_size": int, "mode": "split", "paused": bool,
      "boards": {"naive": {<board>}, "warden": {<board>}}}
 
 Entering split mode always starts a *fresh* pair of worlds (same seed on both sides) —
@@ -49,6 +50,17 @@ Control messages (client -> server), one JSON object per WS text frame:
     {"action": "set_robot_count", "count": int}
     {"action": "set_grid_size", "size": int}
     {"action": "set_broadcast_lag", "level": "normal" | "degraded" | "adversarial"}
+    {"action": "set_paused", "paused": bool}
+    {"action": "reset"}
+
+set_paused stops/resumes ticking without touching sim state — while paused, the server
+keeps re-broadcasting the same last state (so a client that connects or reconnects while
+paused still gets a real payload instead of nothing) rather than freezing the board on a
+half-drawn frame. `state["paused"]` reflects the current value on every broadcast.
+
+reset rebuilds the current board(s) from tick 0 with fresh spawn positions, keeping the
+current grid size / robot count / broadcast-lag preference, but with a newly rolled seed
+— repeated resets show a different layout each time rather than replaying the same one.
 
 set_broadcast_lag controls the Warden filter's refresh interval (build spec §6 Phase 5
 step 7, the amendment) — it's a standing preference, applied to whichever Warden
@@ -61,6 +73,7 @@ collisions, ever, by construction — not a coincidence of this demo's random se
 
 import asyncio
 import json
+import random
 
 import websockets
 
@@ -102,6 +115,9 @@ class SimulationServer:
         self.mode = "warden"  # "naive" | "warden" | "split" — see note below on the default
         self.broadcast_lag_level = DEFAULT_BROADCAST_LAG
         self.clients: set = set()
+        self.paused = False
+        self._last_state: dict | None = None
+        self._seed = DEFAULT_SEED  # reset() rerolls this for a fresh layout each time
 
         self.sim = self._new_single_simulator()
         self.totals = _zero_totals()
@@ -128,7 +144,7 @@ class SimulationServer:
         sim = Simulator(
             grid_size=self.grid_size,
             robot_count=DEFAULT_ROBOT_COUNT,
-            seed=DEFAULT_SEED,
+            seed=self._seed,
             naive_mode=(self.mode == "naive"),
             warden_mode=(self.mode != "naive"),  # covers "warden" and the initial "split"-free default
             ring_buffer_capacity=RING_BUFFER_CAPACITY,
@@ -142,14 +158,14 @@ class SimulationServer:
         naive_sim = Simulator(
             grid_size=self.grid_size,
             robot_count=robot_count,
-            seed=DEFAULT_SEED,
+            seed=self._seed,
             naive_mode=True,
             ring_buffer_capacity=RING_BUFFER_CAPACITY,
         )
         warden_sim = Simulator(
             grid_size=self.grid_size,
             robot_count=robot_count,
-            seed=DEFAULT_SEED,
+            seed=self._seed,
             warden_mode=True,
             ring_buffer_capacity=RING_BUFFER_CAPACITY,
         )
@@ -177,13 +193,35 @@ class SimulationServer:
         robot_count = len(self.sim.world.robots)
         if mode == "naive":
             self.sim.coordinator = Coordinator(
-                robot_count=robot_count, seed=DEFAULT_SEED, ring_buffer_capacity=RING_BUFFER_CAPACITY
+                robot_count=robot_count, seed=self._seed, ring_buffer_capacity=RING_BUFFER_CAPACITY
             )
         else:
             self.sim.coordinator = WardenCoordinator(
-                robot_count=robot_count, seed=DEFAULT_SEED, ring_buffer_capacity=RING_BUFFER_CAPACITY
+                robot_count=robot_count, seed=self._seed, ring_buffer_capacity=RING_BUFFER_CAPACITY
             )
             self._apply_broadcast_lag(self.sim)
+
+    def set_paused(self, paused: bool) -> None:
+        self.paused = bool(paused)
+
+    def reset(self) -> None:
+        """Rebuilds the current board(s) from tick 0 with a freshly rolled seed —
+        same grid size / robot count / broadcast-lag preference, different layout each
+        time rather than replaying the same one. Refreshes `_last_state` immediately
+        (rather than waiting for the next non-paused broadcast_loop tick) so hitting
+        Reset while paused is visible right away instead of silently doing nothing
+        until Play is pressed."""
+        self._seed = random.randint(0, 2**31 - 1)
+        if self.mode == "split":
+            robot_count = len(self.split_sims["naive"].world.robots)
+            self.split_sims = self._new_split_simulators(robot_count)
+            self.split_totals = {"naive": _zero_totals(), "warden": _zero_totals()}
+            befores = {label: sim.world.robot_positions() for label, sim in self.split_sims.items()}
+            self._last_state = self._snapshot_split(befores)
+        else:
+            self.sim = self._new_single_simulator()
+            self.totals = _zero_totals()
+            self._last_state = self._snapshot_single(self.sim.world.robot_positions())
 
     def set_broadcast_lag(self, level: str) -> None:
         """Live-adjusts the Warden filter's refresh interval on whichever coordinator(s)
@@ -259,7 +297,9 @@ class SimulationServer:
         ]
 
         stats = {"instant_moves": 0, "confirmed_checks": 0, "conflicts_avoided": 0, "queue_depth": 0}
-        if sim.coordinator is not None:
+        # A freshly built coordinator (reset(), or a snapshot taken before any tick())
+        # has an empty log — nothing has happened yet, so the zeros above are correct.
+        if sim.coordinator is not None and sim.coordinator.log:
             entry = sim.coordinator.log[-1]
             if board_mode == "naive":
                 stats["confirmed_checks"] = entry["confirm_checks"]
@@ -294,26 +334,39 @@ class SimulationServer:
     def _step_and_serialize_single(self) -> dict:
         before = self.sim.world.robot_positions()
         self.sim.step()
+        return self._snapshot_single(before)
+
+    def _snapshot_single(self, before: dict) -> dict:
+        """Serializes `self.sim`'s current state against `before` — the caller decides
+        whether that's a pre-step snapshot (normal ticking) or the same-as-current
+        positions (a `reset()` refresh, where nothing has moved yet so dx/dy is 0)."""
         board = self._serialize_board(self.sim, self.mode, before, self.totals)
         return {
             "type": "tick",
             "grid_size": self.grid_size,
             "mode": self.mode,
             "broadcast_lag": self.broadcast_lag_level,
+            "paused": self.paused,
             **board,
         }
 
     def _step_and_serialize_split(self) -> dict:
-        boards = {}
-        for label, sim in self.split_sims.items():
-            before = sim.world.robot_positions()
+        befores = {label: sim.world.robot_positions() for label, sim in self.split_sims.items()}
+        for sim in self.split_sims.values():
             sim.step()
-            boards[label] = self._serialize_board(sim, label, before, self.split_totals[label])
+        return self._snapshot_split(befores)
+
+    def _snapshot_split(self, befores: dict[str, dict]) -> dict:
+        boards = {
+            label: self._serialize_board(sim, label, befores[label], self.split_totals[label])
+            for label, sim in self.split_sims.items()
+        }
         return {
             "type": "tick_split",
             "grid_size": self.grid_size,
             "mode": "split",
             "broadcast_lag": self.broadcast_lag_level,
+            "paused": self.paused,
             "boards": boards,
         }
 
@@ -331,6 +384,10 @@ class SimulationServer:
             self.set_grid_size(int(message.get("size", 0)))
         elif action == "set_broadcast_lag":
             self.set_broadcast_lag(message.get("level"))
+        elif action == "set_paused":
+            self.set_paused(bool(message.get("paused")))
+        elif action == "reset":
+            self.reset()
 
     async def handle_client(self, websocket) -> None:
         self.clients.add(websocket)
@@ -342,9 +399,15 @@ class SimulationServer:
 
     async def broadcast_loop(self) -> None:
         while True:
-            state = self.step_and_serialize()
-            if self.clients:
-                payload = json.dumps(state)
+            if not self.paused:
+                self._last_state = self.step_and_serialize()
+            if self._last_state is not None:
+                # Keep this fresh every tick, even while paused and not re-stepping —
+                # otherwise a client sees a cached "paused: false" for one tick after
+                # actually pausing, since step_and_serialize() is what normally sets it.
+                self._last_state["paused"] = self.paused
+            if self.clients and self._last_state is not None:
+                payload = json.dumps(self._last_state)
                 await asyncio.gather(*(client.send(payload) for client in self.clients), return_exceptions=True)
             await asyncio.sleep(TICK_INTERVAL_SECONDS)
 

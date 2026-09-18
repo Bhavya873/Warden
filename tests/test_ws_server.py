@@ -230,6 +230,95 @@ def test_set_robot_count_applies_to_both_boards_in_split_mode():
     assert len(server.split_sims["warden"].world.robots) == 40
 
 
+def test_set_paused_stops_ticking_in_the_real_broadcast_loop():
+    # Exercises the actual broadcast_loop coroutine (not a reimplementation of its
+    # logic) so this fails if the real pause-handling code path breaks, not just a
+    # test double of it.
+    async def body():
+        server = SimulationServer()
+        loop_task = asyncio.ensure_future(server.broadcast_loop())
+        try:
+            await asyncio.sleep(0.35)  # a few ticks at TICK_INTERVAL_SECONDS=0.1
+            server.set_paused(True)
+            await asyncio.sleep(0.05)
+            tick_at_pause = server._last_state["boards"]["naive"]["tick"]
+
+            await asyncio.sleep(0.5)  # several tick intervals while paused
+            tick_after_wait = server._last_state["boards"]["naive"]["tick"]
+            assert tick_after_wait == tick_at_pause, "ticked while paused"
+            assert server._last_state["paused"] is True
+
+            server.set_paused(False)
+            await asyncio.sleep(0.35)
+            tick_after_resume = server._last_state["boards"]["naive"]["tick"]
+            assert tick_after_resume > tick_at_pause, "never resumed"
+        finally:
+            loop_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await loop_task
+
+    asyncio.run(body())
+
+
+def test_reset_restarts_from_tick_zero_with_a_different_layout():
+    server = SimulationServer()
+    for _ in range(30):
+        server.step_and_serialize()
+    positions_before = {r.robot_id: (r.x, r.y) for r in server.split_sims["naive"].world.robots}
+    assert server.split_sims["naive"].world.tick_count == 30
+
+    server.reset()
+
+    assert server.split_sims["naive"].world.tick_count == 0
+    assert server.split_sims["warden"].world.tick_count == 0
+    positions_after = {r.robot_id: (r.x, r.y) for r in server.split_sims["naive"].world.robots}
+    assert positions_after != positions_before  # freshly rolled seed, not a replay
+    # totals reset along with the rebuilt coordinators
+    assert server.split_totals["naive"] == {
+        "instant_moves": 0,
+        "confirmed_checks": 0,
+        "conflicts_avoided": 0,
+        "near_misses": 0,
+    }
+
+
+def test_reset_preserves_robot_count_and_grid_size():
+    server = SimulationServer()
+    server.set_grid_size(20)
+    server.set_robot_count(45)
+
+    server.reset()
+
+    assert server.grid_size == 20
+    assert len(server.split_sims["naive"].world.robots) == 45
+    assert len(server.split_sims["warden"].world.robots) == 45
+    assert server.split_sims["naive"].world.grid_size == 20
+
+
+def test_reset_while_paused_is_visible_immediately():
+    # Regression: reset() rebuilt the sim state correctly but left _last_state (what
+    # broadcast_loop actually re-sends every tick while paused) untouched, so hitting
+    # Reset while paused silently did nothing until Play was pressed — the cached
+    # payload kept showing the pre-reset tick count and positions. reset() must refresh
+    # _last_state itself, not rely on the next non-paused step to do it, and it must
+    # not crash doing so (the freshly built coordinator has never ticked, so its log
+    # is empty going into that first serialization).
+    server = SimulationServer()
+    for _ in range(25):
+        server.step_and_serialize()
+    server.set_paused(True)
+    server._last_state = server.step_and_serialize()  # simulate broadcast_loop's last cached send
+    tick_before_reset = server._last_state["boards"]["naive"]["tick"]
+    assert tick_before_reset > 0
+
+    server.reset()
+
+    assert server._last_state is not None
+    assert server._last_state["boards"]["naive"]["tick"] == 0
+    assert server._last_state["boards"]["warden"]["tick"] == 0
+    assert server._last_state["paused"] is True  # reset doesn't implicitly resume
+
+
 def test_set_broadcast_lag_is_live_and_has_no_effect_in_naive_mode():
     server = SimulationServer()
     server.set_mode("warden")

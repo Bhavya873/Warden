@@ -34,6 +34,8 @@ const floorNaiveCtx = floorNaiveCanvas.getContext("2d");
 const floorWardenCanvas = document.getElementById("floor-warden");
 const floorWardenCtx = floorWardenCanvas.getContext("2d");
 
+const playPauseBtn = document.getElementById("play-pause-btn");
+const resetBtn = document.getElementById("reset-btn");
 const robotCountInput = document.getElementById("robot-count");
 const robotCountValue = document.getElementById("robot-count-value");
 const gridSizeInput = document.getElementById("grid-size");
@@ -65,7 +67,7 @@ let socket = null;
 const mixChart = new Chart(document.getElementById("mix-chart"), {
   type: "bar",
   data: {
-    labels: ["Instant", "Checked", "Conflicts caught", "Near-misses"],
+    labels: ["Instant", "Server checks", "Conflicts caught", "Near-misses"],
     datasets: [
       { label: "Baseline", data: [0, 0, 0, 0], backgroundColor: COLORS.accentNaive },
       { label: "Warden", data: [0, 0, 0, 0], backgroundColor: COLORS.structural },
@@ -118,6 +120,24 @@ function pushRolling(data, value) {
   if (data.length > LOAD_CHART_WINDOW) data.shift();
 }
 
+// Chart.js's built-in auto-scaling recomputes the axis max every single tick, so a
+// value oscillating quickly (e.g. 80 <-> 120) makes the whole axis visibly snap back
+// and forth. An EMA-smoothed max grows fast (so real spikes are never clipped) but
+// shrinks slowly (so a brief dip doesn't yank the axis back down), which reads as a
+// steady axis instead of a jittery one.
+function makeSmoothedMax(seed) {
+  let current = seed;
+  return function smoothedMax(dataMax) {
+    const target = Math.max(dataMax * 1.15, seed);
+    const alpha = target > current ? 0.3 : 0.02;
+    current += (target - current) * alpha;
+    return current;
+  };
+}
+
+const mixSmoothedMax = makeSmoothedMax(10);
+const loadSmoothedMax = makeSmoothedMax(5);
+
 // --- WebSocket -----------------------------------------------------------
 
 function connect() {
@@ -164,11 +184,15 @@ function render(state) {
     warden.stats.conflicts_avoided,
     warden.stats.near_misses,
   ];
+  const mixDataMax = Math.max(...mixChart.data.datasets[0].data, ...mixChart.data.datasets[1].data);
+  mixChart.options.scales.y.max = mixSmoothedMax(mixDataMax);
   mixChart.update("none");
 
   pushRolling(loadChart.data.datasets[0].data, naive.stats.queue_depth);
   pushRolling(loadChart.data.datasets[1].data, warden.stats.queue_depth);
   pushRolling(loadChart.data.labels, naive.tick); // both boards are stepped together, one shared timeline
+  const loadDataMax = Math.max(...loadChart.data.datasets[0].data, ...loadChart.data.datasets[1].data);
+  loadChart.options.scales.y.max = loadSmoothedMax(loadDataMax);
   loadChart.update("none");
 
   statTick.textContent = `(tick ${naive.tick})`;
@@ -182,6 +206,12 @@ function render(state) {
   splitTotalEls.warden.nearMisses.textContent = warden.totals.near_misses;
 
   syncControls(naive.robot_count, state.grid_size, state.broadcast_lag);
+
+  // Don't stomp the label mid-click — harmless either way since the next broadcast
+  // (100ms later) re-syncs it, but avoids a visible flicker right after clicking.
+  if (document.activeElement !== playPauseBtn) {
+    playPauseBtn.textContent = state.paused ? "Play" : "Pause";
+  }
 }
 
 // --- Floor drawing -------------------------------------------------
@@ -276,6 +306,16 @@ function send(message) {
     socket.send(JSON.stringify(message));
   }
 }
+
+playPauseBtn.addEventListener("click", () => {
+  const willPause = playPauseBtn.textContent === "Pause";
+  send({ action: "set_paused", paused: willPause });
+  playPauseBtn.textContent = willPause ? "Play" : "Pause"; // optimistic; next broadcast confirms it
+});
+
+resetBtn.addEventListener("click", () => {
+  send({ action: "reset" });
+});
 
 broadcastLagSelect.addEventListener("change", () => {
   send({ action: "set_broadcast_lag", level: broadcastLagSelect.value });

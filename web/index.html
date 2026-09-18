@@ -13,15 +13,25 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="console-header">
-    <div class="title-block">
+  <header class="site-header">
+    <div class="header-top">
       <h1>Warden</h1>
+      <div class="header-status">
+        <span id="live-dot" class="live-dot"></span>
+        <span id="connection-text">connecting&hellip;</span>
+        <span id="stat-tick" class="mono"></span>
+      </div>
     </div>
-    <div class="header-status">
-      <span id="live-dot" class="live-dot"></span>
-      <span id="connection-text">connecting&hellip;</span>
-      <span id="stat-tick" class="mono"></span>
-    </div>
+    <p class="abstract">
+      Collision-free zone claiming for a warehouse robot fleet: instead of asking a server before every
+      move, each robot checks a local Ribbon filter first, and only falls back to an exact check against
+      the server's ring buffer when the filter reports a cell as possibly claimed — the same
+      fast-reject-then-confirm pattern used in network duplicate-detection systems, applied here to
+      spatial coordination. The same idea generalizes to any system where a cheap approximate check can
+      absorb most traffic and escalate only genuine conflicts to an expensive, exact one. Built with a
+      Rust core (PyO3) for the filter and ring buffer, a Python simulation, and this live WebSocket
+      dashboard comparing it against an always-ask baseline.
+    </p>
   </header>
 
   <main class="layout">
@@ -44,65 +54,76 @@
         <li title="The server found this cell already taken and blocked the move">
           <span class="swatch swatch-conflict"></span>Conflict caught
         </li>
-        <li title="The local filter said this cell was free, but the server's check caught that it wasn't — no collision happened">
+        <li title="The local filter said this cell was free, and was wrong — the server's final check caught the mistake before it became a real collision. Shows the safety guarantee holds even when the filter is out of date.">
           <span class="swatch swatch-near-miss"></span>Near-miss
         </li>
       </ul>
     </section>
 
     <aside class="controls">
-      <div class="control">
-        <label for="robot-count">
-          Robots <span class="mono value" id="robot-count-value">20</span>
-        </label>
-        <input id="robot-count" type="range" min="1" max="150" value="20" />
+      <div class="panel">
+        <h2 class="panel-title">Simulation</h2>
+        <div class="button-row">
+          <button id="play-pause-btn" class="btn btn-primary" type="button">Pause</button>
+          <button id="reset-btn" class="btn btn-outline" type="button">Reset</button>
+        </div>
       </div>
-      <div class="control">
-        <label for="grid-size">
-          Grid size <span class="mono value" id="grid-size-value">30</span>
-        </label>
-        <input id="grid-size" type="range" min="10" max="40" value="30" />
-      </div>
-      <div class="control">
-        <label for="broadcast-lag" title="How often Warden's local filter refreshes — no effect on the Baseline board">
-          Broadcast lag
-        </label>
-        <select id="broadcast-lag">
-          <option value="normal">Normal</option>
-          <option value="degraded">Degraded</option>
-          <option value="adversarial">Adversarial</option>
-        </select>
+
+      <div class="panel">
+        <h2 class="panel-title">Configuration</h2>
+        <div class="control">
+          <label for="robot-count">
+            Robots <span class="mono value" id="robot-count-value">20</span>
+          </label>
+          <input id="robot-count" type="range" min="1" max="150" value="20" />
+        </div>
+        <div class="control">
+          <label for="grid-size">
+            Grid size <span class="mono value" id="grid-size-value">30</span>
+          </label>
+          <input id="grid-size" type="range" min="10" max="40" value="30" />
+        </div>
+        <div class="control">
+          <label for="broadcast-lag" title="How often Warden's local filter refreshes — no effect on the Baseline board">
+            Broadcast lag
+          </label>
+          <select id="broadcast-lag">
+            <option value="normal">Normal</option>
+            <option value="degraded">Degraded</option>
+            <option value="adversarial">Adversarial</option>
+          </select>
+        </div>
       </div>
     </aside>
   </main>
 
   <section class="dashboard">
     <div class="totals-split">
-      <div class="totals-column">
-        <h4><span class="dot dot-naive"></span>Baseline</h4>
+      <div class="panel totals-column">
+        <h2 class="panel-title"><span class="dot dot-naive"></span>Baseline</h2>
         <dl class="totals">
           <div class="total"><dt>Moves</dt><dd class="mono" id="split-naive-total-moves">0</dd></div>
-          <div class="total"><dt title="Moves that needed a round trip to the server">Checked</dt><dd class="mono" id="split-naive-total-confirmed">0</dd></div>
+          <div class="total"><dt title="A move that needed a round trip to the server before it could proceed">Server checks</dt><dd class="mono" id="split-naive-total-confirmed">0</dd></div>
           <div class="total"><dt title="The server found a real conflict and blocked the move">Conflicts caught</dt><dd class="mono" id="split-naive-total-conflicts">0</dd></div>
-          <div class="total total-near-miss"><dt title="Filter said free, server's check caught it was wrong — no collision happened">Near-misses</dt><dd class="mono" id="split-naive-total-near-misses">0</dd></div>
+          <div class="total total-near-miss"><dt title="The local filter said free and was wrong — the server's final check caught the mistake before it became a real collision">Near-misses</dt><dd class="mono" id="split-naive-total-near-misses">0</dd></div>
         </dl>
       </div>
-      <div class="totals-column">
-        <h4><span class="dot dot-warden"></span>Warden</h4>
+      <div class="panel totals-column">
+        <h2 class="panel-title"><span class="dot dot-warden"></span>Warden</h2>
         <dl class="totals">
           <div class="total"><dt>Moves</dt><dd class="mono" id="split-warden-total-moves">0</dd></div>
-          <div class="total"><dt title="Moves that needed a round trip to the server">Checked</dt><dd class="mono" id="split-warden-total-confirmed">0</dd></div>
+          <div class="total"><dt title="A move that needed a round trip to the server before it could proceed">Server checks</dt><dd class="mono" id="split-warden-total-confirmed">0</dd></div>
           <div class="total"><dt title="The server found a real conflict and blocked the move">Conflicts caught</dt><dd class="mono" id="split-warden-total-conflicts">0</dd></div>
-          <div class="total total-near-miss"><dt title="Filter said free, server's check caught it was wrong — no collision happened">Near-misses</dt><dd class="mono" id="split-warden-total-near-misses">0</dd></div>
+          <div class="total total-near-miss"><dt title="The local filter said free and was wrong — the server's final check caught the mistake before it became a real collision">Near-misses</dt><dd class="mono" id="split-warden-total-near-misses">0</dd></div>
         </dl>
       </div>
     </div>
 
     <div class="charts">
-      <div class="chart-box">
+      <div class="panel chart-box">
         <canvas id="mix-chart"></canvas>
       </div>
-      <div class="chart-box">
+      <div class="panel chart-box">
         <canvas id="load-chart"></canvas>
       </div>
     </div>

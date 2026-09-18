@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Warden</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>Warden</h1>
+  <div class="layout">
+    <canvas id="floor" width="600" height="600"></canvas>
+    <div class="controls">
+      <div class="control">
+        <label for="mode">Mode</label>
+        <select id="mode">
+          <option value="warden">Warden</option>
+          <option value="naive">Naive</option>
+        </select>
+      </div>
+      <div class="control">
+        <label for="robot-count">Robots: <span id="robot-count-value">20</span></label>
+        <input id="robot-count" type="range" min="1" max="150" value="20" />
+      </div>
+      <div class="control">
+        <label for="grid-size">Grid size: <span id="grid-size-value">30</span></label>
+        <input id="grid-size" type="range" min="10" max="40" value="30" />
+      </div>
+      <dl class="stats">
+        <dt>Tick</dt><dd id="stat-tick">0</dd>
+        <dt>Instant moves</dt><dd id="stat-instant">0</dd>
+        <dt>Confirmed checks</dt><dd id="stat-confirmed">0</dd>
+        <dt>Queue depth</dt><dd id="stat-queue">0</dd>
+      </dl>
+      <p id="connection-status">connecting&hellip;</p>
+    </div>
+  </div>
+  <script src="grid_view.js"></script>
+</body>
+</html>

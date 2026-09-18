@@ -27,8 +27,9 @@ class Coordinator:
         min_delay_ticks: int = 1,
         max_delay_ticks: int = 3,
         claim_ttl_ticks: int = 2,
+        ring_buffer_capacity: int | None = None,
     ):
-        capacity = max(1, robot_count * CAPACITY_MULTIPLIER)
+        capacity = ring_buffer_capacity if ring_buffer_capacity is not None else max(1, robot_count * CAPACITY_MULTIPLIER)
         self._ring_buffer = warden_core.RingBuffer(capacity)
         self._rng = random.Random(seed)
         self.min_delay_ticks = min_delay_ticks
@@ -133,6 +134,7 @@ class WardenCoordinator:
         claim_ttl_ticks: int = 2,
         filter_refresh_interval_ticks: int = DEFAULT_FILTER_REFRESH_INTERVAL_TICKS,
         filter_target_fpr: float = DEFAULT_FILTER_TARGET_FPR,
+        ring_buffer_capacity: int | None = None,
     ):
         self._coordinator = Coordinator(
             robot_count=robot_count,
@@ -140,6 +142,7 @@ class WardenCoordinator:
             min_delay_ticks=min_delay_ticks,
             max_delay_ticks=max_delay_ticks,
             claim_ttl_ticks=claim_ttl_ticks,
+            ring_buffer_capacity=ring_buffer_capacity,
         )
         self.filter_refresh_interval_ticks = filter_refresh_interval_ticks
         self.filter_target_fpr = filter_target_fpr

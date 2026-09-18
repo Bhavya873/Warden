@@ -15,15 +15,20 @@ class Simulator:
         seed: int = 0,
         naive_mode: bool = False,
         warden_mode: bool = False,
+        ring_buffer_capacity: int | None = None,
     ):
         if naive_mode and warden_mode:
             raise ValueError("choose one of naive_mode or warden_mode, not both")
 
         self.world = GridWorld(grid_size=grid_size, robot_count=robot_count, seed=seed)
         if warden_mode:
-            self.coordinator = WardenCoordinator(robot_count=robot_count, seed=seed)
+            self.coordinator = WardenCoordinator(
+                robot_count=robot_count, seed=seed, ring_buffer_capacity=ring_buffer_capacity
+            )
         elif naive_mode:
-            self.coordinator = Coordinator(robot_count=robot_count, seed=seed)
+            self.coordinator = Coordinator(
+                robot_count=robot_count, seed=seed, ring_buffer_capacity=ring_buffer_capacity
+            )
         else:
             self.coordinator = None
 

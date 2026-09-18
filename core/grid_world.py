@@ -44,6 +44,7 @@ class GridWorld:
         # and tasks/staleness-finding.md.
         self.near_miss_count = 0
         self._spawn_robots()
+        self._next_robot_id = self.robot_count
 
     def _random_free_cell(self) -> Cell:
         while True:
@@ -140,3 +141,25 @@ class GridWorld:
 
     def occupied_cells(self) -> dict[Cell, int]:
         return dict(self._occupied)
+
+    def add_robot(self) -> Robot:
+        """Spawns one robot at a random free cell, without touching any existing robot's
+        state — for the live robot-count slider (build spec §6 Phase 5 step 2)."""
+        x, y = self._random_free_cell()
+        robot_id = self._next_robot_id
+        self._next_robot_id += 1
+        self._occupied[(x, y)] = robot_id
+        target_x, target_y = self._random_target(exclude=(x, y))
+        robot = Robot(robot_id, x, y, target_x, target_y)
+        self.robots.append(robot)
+        self.robot_count += 1
+        return robot
+
+    def remove_robot(self) -> Robot | None:
+        """Removes the most recently added robot. Returns None if there are none left."""
+        if not self.robots:
+            return None
+        robot = self.robots.pop()
+        del self._occupied[(robot.x, robot.y)]
+        self.robot_count -= 1
+        return robot

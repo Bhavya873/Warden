@@ -1,0 +1,64 @@
+/* Minimal, functional styling — the real design pass happens in Task 12. */
+
+body {
+  font-family: system-ui, sans-serif;
+  margin: 24px;
+  color: #222;
+}
+
+h1 {
+  font-size: 1.25rem;
+  margin: 0 0 16px;
+}
+
+.layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+#floor {
+  border: 1px solid #ccc;
+  background: #fff;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 220px;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.control label {
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.stats dt {
+  color: #555;
+}
+
+.stats dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+#connection-status {
+  font-size: 0.8rem;
+  color: #888;
+}

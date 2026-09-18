@@ -191,6 +191,7 @@ class SimulationServer:
         self.grid_size = size
         if self.mode == "split":
             robot_count = len(self.split_sims["naive"].world.robots)
+            robot_count = min(robot_count, size * size)  # can't spawn more robots than cells
             self.split_sims = self._new_split_simulators(robot_count)
             self.split_totals = {"naive": _zero_totals(), "warden": _zero_totals()}
         else:
@@ -202,7 +203,8 @@ class SimulationServer:
         worlds = [sim.world for sim in self.split_sims.values()] if self.mode == "split" else [self.sim.world]
         for world in worlds:
             while len(world.robots) < count:
-                world.add_robot()
+                if world.add_robot() is None:
+                    break  # grid is full — fewer robots than requested, not a hang
             while len(world.robots) > count:
                 world.remove_robot()
 

@@ -23,6 +23,15 @@ Cell = tuple[int, int]
 AXIS_FLIP_THRESHOLD_TICKS = 6
 RANDOM_ESCAPE_THRESHOLD_TICKS = 15
 
+# New targets are picked within grid_size // TARGET_LOCALITY_DIVISOR cells of a robot's
+# current position, not anywhere on the grid. Long cross-grid trips between uniform
+# random points are what make robots disproportionately pass through — and visually
+# cluster in — the grid's center: a well-known geometric-probability effect (the same
+# reason the midpoint of two uniform random points concentrates toward the center of a
+# region rather than spreading evenly). Keeping trips local weakens that bias while
+# robots still cover the whole grid over many hops (a bounded-step random walk).
+TARGET_LOCALITY_DIVISOR = 3
+
 
 class CollisionError(RuntimeError):
     """Two robots ended up occupying the same cell. Must never happen — see build spec §7."""
@@ -52,14 +61,33 @@ class GridWorld:
         self._next_robot_id = self.robot_count
 
     def _random_free_cell(self) -> Cell:
+        # Without this guard, a caller that overfills the grid (robot_count >
+        # grid_size**2) spins here forever — every cell is occupied, so "not in
+        # self._occupied" never becomes true. A hung synchronous call blocks the
+        # whole asyncio event loop in server/ws_server.py (it can't accept new
+        # WebSocket connections while stuck here), which looks like "the page never
+        # connects" with no error anywhere. Fail fast instead.
+        if len(self._occupied) >= self.grid_size * self.grid_size:
+            raise RuntimeError(
+                f"grid is full: {len(self._occupied)} robots on a {self.grid_size}x{self.grid_size} grid"
+            )
         while True:
             cell = (self._rng.randrange(self.grid_size), self._rng.randrange(self.grid_size))
             if cell not in self._occupied:
                 return cell
 
     def _random_target(self, exclude: Cell) -> Cell:
+        radius = max(2, self.grid_size // TARGET_LOCALITY_DIVISOR)
+        cx, cy = exclude
+        x_lo, x_hi = max(0, cx - radius), min(self.grid_size - 1, cx + radius)
+        y_lo, y_hi = max(0, cy - radius), min(self.grid_size - 1, cy + radius)
+        if (x_hi - x_lo + 1) * (y_hi - y_lo + 1) <= 1:
+            # window collapsed to just `exclude` itself (only possible on a tiny grid) —
+            # fall back to the full grid rather than looping forever looking for a
+            # second option that doesn't exist in the local window.
+            x_lo, x_hi, y_lo, y_hi = 0, self.grid_size - 1, 0, self.grid_size - 1
         while True:
-            cell = (self._rng.randrange(self.grid_size), self._rng.randrange(self.grid_size))
+            cell = (self._rng.randint(x_lo, x_hi), self._rng.randint(y_lo, y_hi))
             if cell != exclude:
                 return cell
 
@@ -149,9 +177,13 @@ class GridWorld:
     def occupied_cells(self) -> dict[Cell, int]:
         return dict(self._occupied)
 
-    def add_robot(self) -> Robot:
+    def add_robot(self) -> Robot | None:
         """Spawns one robot at a random free cell, without touching any existing robot's
-        state — for the live robot-count slider (build spec §6 Phase 5 step 2)."""
+        state — for the live robot-count slider (build spec §6 Phase 5 step 2). Returns
+        None (rather than raising) if the grid has no free cell left, so a caller adding
+        robots in a loop can just check for None instead of needing a try/except."""
+        if len(self._occupied) >= self.grid_size * self.grid_size:
+            return None
         x, y = self._random_free_cell()
         robot_id = self._next_robot_id
         self._next_robot_id += 1

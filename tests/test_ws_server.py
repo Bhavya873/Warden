@@ -125,6 +125,32 @@ def test_set_grid_size_reinitializes():
     assert server.sim.world.tick_count == 0  # fresh world, as documented
 
 
+def test_set_robot_count_past_grid_capacity_does_not_hang():
+    # Regression: this exact sequence (drag robots to the max, then the grid to its
+    # min — 150 robots > 10x10 = 100 cells) hung the live server's event loop, because
+    # add_robot() looped forever looking for a free cell that no longer existed. A
+    # test that completes at all is the proof this no longer hangs.
+    server = SimulationServer()
+    server.set_grid_size(10)
+    server.set_robot_count(MAX_ROBOT_COUNT)  # 150 requested, only 100 cells exist
+
+    assert len(server.sim.world.robots) == 100
+    state = server.step_and_serialize()  # must not raise or hang
+    assert state["robot_count"] == 100
+
+
+def test_set_grid_size_shrink_below_robot_count_does_not_hang_in_split_mode():
+    server = SimulationServer()
+    server.set_mode("split")
+    server.set_robot_count(MAX_ROBOT_COUNT)
+    server.set_grid_size(10)  # shrinking below the current robot count, both boards
+
+    assert len(server.split_sims["naive"].world.robots) == 100
+    assert len(server.split_sims["warden"].world.robots) == 100
+    state = server.step_and_serialize()  # must not raise or hang
+    assert state["boards"]["naive"]["robot_count"] == 100
+
+
 def test_split_mode_shape():
     server = SimulationServer()
     server.set_mode("split")

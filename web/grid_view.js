@@ -9,16 +9,20 @@ const LOAD_CHART_WINDOW = 150; // ticks of history kept for the rolling line cha
 // Mirrors the custom properties in style.css — kept in sync by hand, small enough not
 // to warrant a shared token pipeline between CSS and canvas/Chart.js drawing code.
 const COLORS = {
-  line: "#ccd4db",
-  ink: "#1b222c",
-  inkMuted: "#62707d",
-  structural: "#33455c", // Warden series in split charts
+  line: "#e4e7ec",
+  ink: "#14181f",
+  inkMuted: "#6b7280",
+  structural: "#3b5bdb", // Warden series in split charts
   accentNaive: "#c9682e", // Naive series in split charts
   moved: "#2e9e4f",
   waiting: "#c98a12",
   conflict: "#d64545",
   nearMiss: "#8b3fc9",
 };
+
+// Chart.js otherwise falls back to the browser's default sans-serif for titles/legend
+// text, which visually mismatches the rest of the page.
+Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
 
 const floorCanvas = document.getElementById("floor");
 const floorCtx = floorCanvas.getContext("2d");

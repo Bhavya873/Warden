@@ -1,23 +1,28 @@
-/* Warden — warehouse floor-plan console.
-   The grid canvas is the actual subject matter, so the rest of the page borrows its
-   vocabulary: hairline rules instead of cards or shadows, a cool blueprint-toned
-   neutral palette, and tabular figures for anything measured. Saturated color is
-   reserved entirely for the move-outcome legend (green/amber/red/purple) so it reads
-   unambiguously against the quiet chrome around it. */
+/* Warden — clean instrument dashboard.
+   Whitespace does the separating instead of rules — borders survive only where they
+   mark a literal edge (the floor canvas, the chart panels). Two elevation tiers, used
+   narrowly: the floor stays flat (it's the raw instrument reading), the two chart
+   panels get radius + a soft shadow (they're the reporting layer). Two chrome accents
+   (Warden blue, Naive rust), each tied to a real thing, no third decorative color.
+   Saturated color is otherwise reserved entirely for the move-outcome legend
+   (green/amber/red/purple) so it reads unambiguously against the quiet chrome. */
 
 :root {
-  --paper: #edf0f3;
+  --paper: #f7f8fa;
   --panel: #ffffff;
-  --ink: #1b222c;
-  --ink-muted: #62707d;
-  --line: #ccd4db;
-  --structural: #33455c;
+  --ink: #14181f;
+  --ink-muted: #6b7280;
+  --line: #e4e7ec;
+  --structural: #3b5bdb;
   --accent-naive: #c9682e;
 
   --status-moved: #2e9e4f;
   --status-waiting: #c98a12;
   --status-conflict: #d64545;
   --status-near-miss: #8b3fc9;
+
+  --radius: 6px;
+  --shadow-sm: 0 1px 2px rgba(20, 24, 31, 0.06), 0 1px 1px rgba(20, 24, 31, 0.04);
 
   --font-sans: "IBM Plex Sans", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -31,7 +36,8 @@ body {
   font-family: var(--font-sans);
   background: var(--paper);
   color: var(--ink);
-  margin: 0;
+  margin: 0 auto;
+  max-width: 1400px;
   padding: 32px clamp(16px, 4vw, 48px) 64px;
 }
 
@@ -48,13 +54,12 @@ body {
   align-items: flex-end;
   gap: 24px;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 20px;
-  margin-bottom: 32px;
+  padding-bottom: 24px;
+  margin-bottom: 40px;
 }
 
 .title-block h1 {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 600;
   margin: 0;
   letter-spacing: 0.01em;
@@ -79,7 +84,7 @@ body {
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 260px;
-  gap: 40px;
+  gap: 48px;
   align-items: start;
 }
 
@@ -181,15 +186,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  padding-left: 32px;
-  border-left: 1px solid var(--line);
 }
 
 @media (max-width: 760px) {
   .controls {
-    padding-left: 0;
-    border-left: none;
-    border-top: 1px solid var(--line);
     padding-top: 24px;
   }
 }
@@ -229,7 +229,7 @@ select {
   background: var(--panel);
   color: var(--ink);
   padding: 7px 10px;
-  border-radius: 2px;
+  border-radius: var(--radius);
 }
 
 select:focus-visible,
@@ -241,9 +241,8 @@ input:focus-visible {
 /* --- Dashboard ------------------------------------------------------------ */
 
 .dashboard {
-  margin-top: 48px;
-  border-top: 1px solid var(--line);
-  padding-top: 32px;
+  margin-top: 56px;
+  padding-top: 8px;
 }
 
 .totals {
@@ -266,8 +265,8 @@ input:focus-visible {
 
 .total dd {
   margin: 0;
-  font-size: 1.6rem;
-  font-weight: 500;
+  font-size: 1.75rem;
+  font-weight: 600;
 }
 
 .total-near-miss dd {
@@ -308,5 +307,7 @@ input:focus-visible {
   height: 260px;
   border: 1px solid var(--line);
   background: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
   padding: 16px;
 }

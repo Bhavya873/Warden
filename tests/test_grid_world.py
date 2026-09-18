@@ -1,3 +1,5 @@
+import pytest
+
 from core.grid_world import GridWorld
 
 
@@ -63,6 +65,24 @@ def test_no_permanent_gridlock():
         moves_in_final_window += sum(1 for a, b in zip(before, after) if a != b)
 
     assert moves_in_final_window > 0, "fleet is permanently gridlocked"
+
+
+def test_add_robot_on_a_full_grid_fails_fast_instead_of_hanging():
+    # Regression: _random_free_cell() used to spin forever once the grid had no free
+    # cells left (every server WS control message that could overfill a grid — e.g.
+    # dragging robot count above grid_size**2, or shrinking the grid below the current
+    # robot count in split mode — hung the whole asyncio event loop, since a blocking
+    # synchronous infinite loop never yields back to accept new connections). It must
+    # now fail fast (None from add_robot, RuntimeError from _random_free_cell directly)
+    # instead of looping.
+    grid_size = 3
+    world = GridWorld(grid_size=grid_size, robot_count=grid_size * grid_size, seed=1)
+    assert len(world.robots) == grid_size * grid_size
+
+    assert world.add_robot() is None  # grid is full — no free cell exists
+
+    with pytest.raises(RuntimeError):
+        world._random_free_cell()
 
 
 def test_target_reassignment_keeps_robots_moving_toward_new_targets():

@@ -11,21 +11,21 @@ const LOAD_CHART_WINDOW = 150; // ticks of history kept for the rolling line cha
 // Mirrors the custom properties in style.css — kept in sync by hand, small enough not
 // to warrant a shared token pipeline between CSS and canvas/Chart.js drawing code.
 const COLORS = {
-  line: "#232838",
-  ink: "#eef1f6",
-  inkMuted: "#8892a3",
-  panel: "#12161f", // --surface — canvas backdrop
-  structural: "#5b8cff", // Warden series
-  accentNaive: "#e8935c", // Naive series
-  moved: "#34d399",
-  waiting: "#fbbf24",
-  conflict: "#f87171",
-  nearMiss: "#c084fc",
+  line: "#3a332c",
+  ink: "#f2ede4",
+  inkMuted: "#a89e8f",
+  panel: "#262220", // --card — canvas backdrop
+  structural: "#e8a23c", // Warden series — hazard-tape amber
+  accentNaive: "#8792a3", // Baseline series — plain steel gray
+  moved: "#4fae62",
+  waiting: "#f5c518",
+  conflict: "#d64545",
+  nearMiss: "#2f86d6", // AGV rotating-beacon blue
 };
 
 // Chart.js defaults assume a light page — set text/grid colors explicitly for the dark
 // theme, and match the page's typeface instead of the browser's default sans-serif.
-Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
+Chart.defaults.font.family = "'Barlow', system-ui, sans-serif";
 Chart.defaults.color = COLORS.inkMuted;
 Chart.defaults.borderColor = COLORS.line;
 

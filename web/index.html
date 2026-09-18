@@ -113,6 +113,18 @@
   <section class="dashboard">
     <div class="panel">
       <h2 class="panel-title">Baseline vs. Warden</h2>
+
+      <div
+        class="hero-stat"
+        title="Share of moves that needed a network round trip to the server, Baseline vs. Warden, compared directly — this is the headline number the rest of the project is demonstrating"
+      >
+        <div class="hero-stat-number mono" id="cmp-reduction-pct">—</div>
+        <div class="hero-stat-label">
+          <span id="cmp-reduction-word">fewer</span> requests reach the server<br />
+          <span class="hero-stat-sub">Warden vs. Baseline, live</span>
+        </div>
+      </div>
+
       <table class="compare">
         <thead>
           <tr>
@@ -126,22 +138,6 @@
             <th scope="row" title="Total moves completed so far">Moves</th>
             <td class="mono" id="cmp-naive-moves">0</td>
             <td class="mono" id="cmp-warden-moves">0</td>
-          </tr>
-          <tr>
-            <th
-              scope="row"
-              title="Share of moves that needed a network round trip to the server, instead of being decided instantly on-device by the local filter"
-            >
-              Requests to server
-            </th>
-            <td>
-              <span class="mono request-pct" id="cmp-naive-requests-pct">0%</span>
-              <div class="request-bar"><div class="request-bar-fill" id="cmp-naive-requests-fill"></div></div>
-            </td>
-            <td>
-              <span class="mono request-pct" id="cmp-warden-requests-pct">0%</span>
-              <div class="request-bar"><div class="request-bar-fill" id="cmp-warden-requests-fill"></div></div>
-            </td>
           </tr>
           <tr>
             <th

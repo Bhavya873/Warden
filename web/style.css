@@ -446,12 +446,42 @@ input[type="range"]:focus-visible {
 }
 
 /* --- Dashboard ------------------------------------------------------------ */
-/* One glass panel: a scannable comparison table (the point-in-time numbers) plus a
-   single unobtrusive trend sparkline — not a wall of separate stat tiles and full
-   charts. Four rows is the whole point: everything on here earns its place. */
+/* One glass panel: a single headline stat (the comparison the whole project exists to
+   demonstrate — fewer server round trips), a short supporting table for the numbers
+   that don't reduce to one comparison, and one trend sparkline. Nothing here restates
+   another row in a different form. */
 
 .dashboard {
   margin-top: 48px;
+}
+
+.hero-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  cursor: help;
+}
+
+.hero-stat-number {
+  font-size: 3rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--primary);
+  line-height: 1;
+}
+
+.hero-stat-label {
+  font-size: 0.9375rem;
+  color: var(--foreground);
+  line-height: 1.4;
+}
+
+.hero-stat-sub {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
 }
 
 .compare {
@@ -500,26 +530,6 @@ input[type="range"]:focus-visible {
 .compare tbody tr:last-child th,
 .compare tbody tr:last-child td {
   border-bottom: none;
-}
-
-.request-pct {
-  display: block;
-  font-size: 1.25rem;
-}
-
-.request-bar {
-  margin-top: 6px;
-  height: 5px;
-  border-radius: 999px;
-  background: var(--border);
-  overflow: hidden;
-}
-
-.request-bar-fill {
-  height: 100%;
-  background: var(--primary);
-  border-radius: 999px;
-  transition: width 200ms ease;
 }
 
 .sparkline-label {

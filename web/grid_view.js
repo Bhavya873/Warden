@@ -48,19 +48,18 @@ const statTick = document.getElementById("stat-tick");
 const compareEls = {
   naive: {
     moves: document.getElementById("cmp-naive-moves"),
-    requestsPct: document.getElementById("cmp-naive-requests-pct"),
-    requestsFill: document.getElementById("cmp-naive-requests-fill"),
     load: document.getElementById("cmp-naive-load"),
     conflicts: document.getElementById("cmp-naive-conflicts"),
   },
   warden: {
     moves: document.getElementById("cmp-warden-moves"),
-    requestsPct: document.getElementById("cmp-warden-requests-pct"),
-    requestsFill: document.getElementById("cmp-warden-requests-fill"),
     load: document.getElementById("cmp-warden-load"),
     conflicts: document.getElementById("cmp-warden-conflicts"),
   },
 };
+
+const reductionPctEl = document.getElementById("cmp-reduction-pct");
+const reductionWordEl = document.getElementById("cmp-reduction-word");
 
 let socket = null;
 
@@ -168,6 +167,7 @@ function render(state) {
   statTick.textContent = `(tick ${naive.tick})`;
   updateCompareRow(compareEls.naive, naive);
   updateCompareRow(compareEls.warden, warden);
+  updateReductionHero(naive, warden);
 
   syncControls(naive.robot_count, state.grid_size, state.broadcast_lag);
 
@@ -179,14 +179,31 @@ function render(state) {
 }
 
 function updateCompareRow(els, board) {
-  const moves = board.totals.instant_moves + board.totals.confirmed_checks;
-  const requestPct = moves > 0 ? Math.round((board.totals.confirmed_checks / moves) * 100) : 0;
-
-  els.moves.textContent = moves;
-  els.requestsPct.textContent = `${requestPct}%`;
-  els.requestsFill.style.width = `${requestPct}%`;
+  els.moves.textContent = board.totals.instant_moves + board.totals.confirmed_checks;
   els.load.textContent = board.stats.queue_depth;
   els.conflicts.textContent = board.totals.conflicts_avoided;
+}
+
+function requestRate(board) {
+  const moves = board.totals.instant_moves + board.totals.confirmed_checks;
+  return moves > 0 ? board.totals.confirmed_checks / moves : null;
+}
+
+// The headline stat: not the two boards' request rates side by side (which makes the
+// reader do the subtraction themselves), but the comparison already done — how much
+// lower Warden's rate is than Baseline's, computed fresh every tick.
+function updateReductionHero(naive, warden) {
+  const naiveRate = requestRate(naive);
+  const wardenRate = requestRate(warden);
+
+  if (naiveRate === null || wardenRate === null || naiveRate === 0) {
+    reductionPctEl.textContent = "—";
+    return;
+  }
+
+  const change = (1 - wardenRate / naiveRate) * 100;
+  reductionWordEl.textContent = change >= 0 ? "fewer" : "more";
+  reductionPctEl.textContent = `${Math.round(Math.abs(change))}%`;
 }
 
 // --- Floor drawing -------------------------------------------------

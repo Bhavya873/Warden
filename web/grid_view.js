@@ -45,28 +45,41 @@ const liveDot = document.getElementById("live-dot");
 const connectionText = document.getElementById("connection-text");
 const statTick = document.getElementById("stat-tick");
 
-const compareEls = {
+const splitTotalEls = {
   naive: {
-    moves: document.getElementById("cmp-naive-moves"),
-    requestsPct: document.getElementById("cmp-naive-requests-pct"),
-    requestsFill: document.getElementById("cmp-naive-requests-fill"),
-    load: document.getElementById("cmp-naive-load"),
-    conflicts: document.getElementById("cmp-naive-conflicts"),
+    moves: document.getElementById("split-naive-total-moves"),
+    confirmed: document.getElementById("split-naive-total-confirmed"),
+    conflicts: document.getElementById("split-naive-total-conflicts"),
+    nearMisses: document.getElementById("split-naive-total-near-misses"),
   },
   warden: {
-    moves: document.getElementById("cmp-warden-moves"),
-    requestsPct: document.getElementById("cmp-warden-requests-pct"),
-    requestsFill: document.getElementById("cmp-warden-requests-fill"),
-    load: document.getElementById("cmp-warden-load"),
-    conflicts: document.getElementById("cmp-warden-conflicts"),
+    moves: document.getElementById("split-warden-total-moves"),
+    confirmed: document.getElementById("split-warden-total-confirmed"),
+    conflicts: document.getElementById("split-warden-total-conflicts"),
+    nearMisses: document.getElementById("split-warden-total-near-misses"),
   },
 };
 
 let socket = null;
 
-// --- Chart: a single, unobtrusive server-load sparkline. The comparison table covers
-// the point-in-time numbers; this is the only place trend-over-time earns a chart. No
-// title, legend, or axis labels — those would just repeat what the table already says. --
+// --- Charts ------------------------------------------------------------
+
+const mixChart = new Chart(document.getElementById("mix-chart"), {
+  type: "bar",
+  data: {
+    labels: ["Instant", "Server checks", "Conflicts caught", "Near-misses"],
+    datasets: [
+      { label: "Baseline", data: [0, 0, 0, 0], backgroundColor: COLORS.accentNaive },
+      { label: "Warden", data: [0, 0, 0, 0], backgroundColor: COLORS.structural },
+    ],
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: true }, title: { display: true, text: "Move outcomes (this tick)" } },
+    scales: { y: { beginAtZero: true } },
+  },
+});
 
 const loadChart = new Chart(document.getElementById("load-chart"), {
   type: "line",
@@ -74,7 +87,7 @@ const loadChart = new Chart(document.getElementById("load-chart"), {
     labels: [],
     datasets: [
       {
-        label: "Baseline",
+        label: "Baseline queue depth",
         data: [],
         borderColor: COLORS.accentNaive,
         backgroundColor: "transparent",
@@ -83,7 +96,7 @@ const loadChart = new Chart(document.getElementById("load-chart"), {
         tension: 0.25,
       },
       {
-        label: "Warden",
+        label: "Warden queue depth",
         data: [],
         borderColor: COLORS.structural,
         backgroundColor: "transparent",
@@ -97,8 +110,8 @@ const loadChart = new Chart(document.getElementById("load-chart"), {
     responsive: true,
     maintainAspectRatio: false,
     animation: false,
-    plugins: { legend: { display: false } },
-    scales: { x: { display: false }, y: { display: false, beginAtZero: true } },
+    plugins: { legend: { display: true }, title: { display: true, text: "Coordinator load (rolling)" } },
+    scales: { x: { display: false }, y: { beginAtZero: true } },
   },
 });
 
@@ -122,6 +135,7 @@ function makeSmoothedMax(seed) {
   };
 }
 
+const mixSmoothedMax = makeSmoothedMax(10);
 const loadSmoothedMax = makeSmoothedMax(5);
 
 // --- WebSocket -----------------------------------------------------------
@@ -158,6 +172,22 @@ function render(state) {
   drawFloor(floorNaiveCtx, floorNaiveCanvas, state.grid_size, naive.robots);
   drawFloor(floorWardenCtx, floorWardenCanvas, state.grid_size, warden.robots);
 
+  mixChart.data.datasets[0].data = [
+    naive.stats.instant_moves,
+    naive.stats.confirmed_checks,
+    naive.stats.conflicts_avoided,
+    naive.stats.near_misses, // always 0 — naive has no filter to go stale
+  ];
+  mixChart.data.datasets[1].data = [
+    warden.stats.instant_moves,
+    warden.stats.confirmed_checks,
+    warden.stats.conflicts_avoided,
+    warden.stats.near_misses,
+  ];
+  const mixDataMax = Math.max(...mixChart.data.datasets[0].data, ...mixChart.data.datasets[1].data);
+  mixChart.options.scales.y.max = mixSmoothedMax(mixDataMax);
+  mixChart.update("none");
+
   pushRolling(loadChart.data.datasets[0].data, naive.stats.queue_depth);
   pushRolling(loadChart.data.datasets[1].data, warden.stats.queue_depth);
   pushRolling(loadChart.data.labels, naive.tick); // both boards are stepped together, one shared timeline
@@ -166,8 +196,14 @@ function render(state) {
   loadChart.update("none");
 
   statTick.textContent = `(tick ${naive.tick})`;
-  updateCompareRow(compareEls.naive, naive);
-  updateCompareRow(compareEls.warden, warden);
+  splitTotalEls.naive.moves.textContent = naive.totals.instant_moves + naive.totals.confirmed_checks;
+  splitTotalEls.naive.confirmed.textContent = naive.totals.confirmed_checks;
+  splitTotalEls.naive.conflicts.textContent = naive.totals.conflicts_avoided;
+  splitTotalEls.naive.nearMisses.textContent = naive.totals.near_misses;
+  splitTotalEls.warden.moves.textContent = warden.totals.instant_moves + warden.totals.confirmed_checks;
+  splitTotalEls.warden.confirmed.textContent = warden.totals.confirmed_checks;
+  splitTotalEls.warden.conflicts.textContent = warden.totals.conflicts_avoided;
+  splitTotalEls.warden.nearMisses.textContent = warden.totals.near_misses;
 
   syncControls(naive.robot_count, state.grid_size, state.broadcast_lag);
 
@@ -176,17 +212,6 @@ function render(state) {
   if (document.activeElement !== playPauseBtn) {
     playPauseBtn.textContent = state.paused ? "Play" : "Pause";
   }
-}
-
-function updateCompareRow(els, board) {
-  const moves = board.totals.instant_moves + board.totals.confirmed_checks;
-  const requestPct = moves > 0 ? Math.round((board.totals.confirmed_checks / moves) * 100) : 0;
-
-  els.moves.textContent = moves;
-  els.requestsPct.textContent = `${requestPct}%`;
-  els.requestsFill.style.width = `${requestPct}%`;
-  els.load.textContent = board.stats.queue_depth;
-  els.conflicts.textContent = board.totals.conflicts_avoided;
 }
 
 // --- Floor drawing -------------------------------------------------

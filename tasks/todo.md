@@ -5,7 +5,7 @@ Flat checklist view of `tasks/plan.md`, in dependency order. Parallel pairs note
 - [x] **Task 0** — Repo & toolchain scaffold (Cargo/PyO3/maturin, dirs, requirements.txt, pytest config)
 - [x] **Task 1** — `ring_buffer.rs` + PyO3 binding *(parallel with Task 2)*
 - [x] **Task 2** — `ribbon_filter.rs` + PyO3 binding *(parallel with Task 1)*
-- [ ] **Task 3** — Grid world + ground-truth collision detection (Phase 1)
+- [x] **Task 3** — Grid world + ground-truth collision detection (Phase 1)
 - [ ] **Checkpoint 1** — review PyO3 boundary shape (after Task 0/1/2)
 - [ ] **Checkpoint 2** — confirm Phase 1 ground-truth check is clean (after Task 3)
 - [ ] **Task 4** — Naive coordinator end-to-end (Phase 2)

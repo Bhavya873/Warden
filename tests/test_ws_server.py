@@ -17,7 +17,8 @@ def test_step_and_serialize_shape():
     assert state["mode"] in ("naive", "warden")
     assert len(state["robots"]) == state["robot_count"]
     for robot in state["robots"]:
-        assert set(robot) == {"id", "x", "y", "dx", "dy", "near_miss"}
+        assert set(robot) == {"id", "x", "y", "dx", "dy", "near_miss", "outcome"}
+        assert robot["outcome"] in ("moved", "waiting", "conflict", "idle")
     assert set(state["stats"]) == {
         "queue_depth",
         "instant_moves",
@@ -28,6 +29,28 @@ def test_step_and_serialize_shape():
     }
     assert set(state["totals"]) == {"instant_moves", "confirmed_checks", "conflicts_avoided", "near_misses"}
     assert state["broadcast_lag"] == "normal"
+
+
+def test_robot_outcome_matches_coordinator_state():
+    server = SimulationServer()
+    server.set_mode("naive")  # every move goes through confirm-check — easy to exercise
+
+    saw_moved = saw_waiting = saw_conflict = False
+    for _ in range(300):
+        state = server.step_and_serialize()
+        claimed_ids = set(server.sim.coordinator.claimed_robot_ids_this_tick)
+        outstanding_ids = set(server.sim.coordinator.outstanding_robot_ids)
+        for robot in state["robots"]:
+            if robot["id"] in claimed_ids:
+                assert robot["outcome"] == "conflict"
+                saw_conflict = True
+            elif robot["outcome"] == "moved":
+                saw_moved = True
+            elif robot["id"] in outstanding_ids:
+                assert robot["outcome"] == "waiting"
+                saw_waiting = True
+
+    assert saw_moved and saw_waiting and saw_conflict, "expected to observe all three outcomes over 300 ticks"
 
 
 def test_step_and_serialize_runs_cleanly_over_many_ticks():

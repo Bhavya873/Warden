@@ -47,6 +47,16 @@ class Coordinator:
         self._checks_this_tick = 0
         self._conflicts_avoided_this_tick = 0
         self.log: list[dict] = []
+        # robot_ids whose confirm-check resolved to "claimed" on the tick just
+        # completed — Task 12's per-robot red marker reads this (a count alone can't
+        # say *which* robot to flash red).
+        self.claimed_robot_ids_this_tick: list[int] = []
+
+    @property
+    def outstanding_robot_ids(self) -> list[int]:
+        """robot_ids with an in-flight confirm-check request right now — Task 12's
+        per-robot yellow marker."""
+        return list(self._outstanding_by_robot.keys())
 
     def claimed_cells(self) -> list[Cell]:
         """The coordinator's broadcast: currently-claimed cells per the ring buffer, as
@@ -69,6 +79,7 @@ class Coordinator:
         del self._outstanding_by_robot[robot.robot_id]
         if claimed:
             self._conflicts_avoided_this_tick += 1  # the confirm-check found a real conflict
+            self.claimed_robot_ids_this_tick.append(robot.robot_id)
         return not claimed
 
     def _request_confirm(self, robot_id: int, cell: Cell) -> None:
@@ -112,6 +123,7 @@ class Coordinator:
         )
         self._checks_this_tick = 0
         self._conflicts_avoided_this_tick = 0
+        self.claimed_robot_ids_this_tick = []
 
 
 DEFAULT_FILTER_REFRESH_INTERVAL_TICKS = 5
@@ -162,6 +174,16 @@ class WardenCoordinator:
         queue_depth, avg_delay) — lets callers read Warden's queue-depth series with
         the same shape as naive mode's, for an apples-to-apples benchmark comparison."""
         return self._coordinator.log
+
+    @property
+    def outstanding_robot_ids(self) -> list[int]:
+        """robot_ids with an in-flight confirm-check request — only ever the "maybe
+        claimed" robots, since the instant path never touches the wrapped Coordinator."""
+        return self._coordinator.outstanding_robot_ids
+
+    @property
+    def claimed_robot_ids_this_tick(self) -> list[int]:
+        return self._coordinator.claimed_robot_ids_this_tick
 
     def can_move(self, robot, next_cell: Cell) -> bool:
         if not self._filter.contains(next_cell):

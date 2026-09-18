@@ -1,25 +1,106 @@
-/* Minimal, functional styling — the real design pass happens in Task 12. */
+/* Warden — warehouse floor-plan console.
+   The grid canvas is the actual subject matter, so the rest of the page borrows its
+   vocabulary: hairline rules instead of cards or shadows, a cool blueprint-toned
+   neutral palette, and tabular figures for anything measured. Saturated color is
+   reserved entirely for the move-outcome legend (green/amber/red/purple) so it reads
+   unambiguously against the quiet chrome around it. */
+
+:root {
+  --paper: #edf0f3;
+  --panel: #ffffff;
+  --ink: #1b222c;
+  --ink-muted: #62707d;
+  --line: #ccd4db;
+  --structural: #33455c;
+  --accent-naive: #c9682e;
+
+  --status-moved: #2e9e4f;
+  --status-waiting: #c98a12;
+  --status-conflict: #d64545;
+  --status-near-miss: #8b3fc9;
+
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
 
 body {
-  font-family: system-ui, sans-serif;
-  margin: 24px;
-  color: #222;
+  font-family: var(--font-sans);
+  background: var(--paper);
+  color: var(--ink);
+  margin: 0;
+  padding: 32px clamp(16px, 4vw, 48px) 64px;
 }
 
-h1 {
-  font-size: 1.25rem;
-  margin: 0 0 16px;
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
+
+/* --- Header --------------------------------------------------------- */
+
+.console-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 20px;
+  margin-bottom: 32px;
+}
+
+.title-block h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+
+.tagline {
+  margin: 4px 0 0;
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}
+
+.header-status {
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  display: flex;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+/* --- Layout ----------------------------------------------------------- */
 
 .layout {
-  display: flex;
-  gap: 24px;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 40px;
+  align-items: start;
 }
 
-#floor {
-  border: 1px solid #ccc;
-  background: #fff;
+@media (max-width: 760px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.floor-area {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+#floor,
+.split-floor canvas {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  max-width: 100%;
+  height: auto;
 }
 
 #floor.hidden {
@@ -33,66 +114,171 @@ h1 {
 
 .split-floors.active {
   display: flex;
+  flex-wrap: wrap;
+}
+
+.split-floor {
+  flex: 1 1 320px;
+  min-width: 0;
 }
 
 .split-floor h3 {
-  font-size: 0.85rem;
-  margin: 0 0 4px;
-  color: #555;
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin: 0 0 6px;
+  color: var(--ink-muted);
 }
 
-.split-floor canvas {
-  border: 1px solid #ccc;
-  background: #fff;
+/* --- Legend ------------------------------------------------------------- */
+
+.legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  font-size: 0.82rem;
+  color: var(--ink-muted);
 }
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.swatch-moved {
+  background: var(--status-moved);
+}
+
+.swatch-waiting {
+  background: var(--status-waiting);
+}
+
+.swatch-conflict {
+  background: var(--status-conflict);
+}
+
+.swatch-near-miss {
+  background: transparent;
+  border: 2px solid var(--status-near-miss);
+  width: 8px;
+  height: 8px;
+}
+
+/* --- Controls ----------------------------------------------------------- */
 
 .controls {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  min-width: 220px;
+  gap: 24px;
+  padding-left: 32px;
+  border-left: 1px solid var(--line);
+}
+
+@media (max-width: 760px) {
+  .controls {
+    padding-left: 0;
+    border-left: none;
+    border-top: 1px solid var(--line);
+    padding-top: 24px;
+  }
 }
 
 .control {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .control label {
   font-size: 0.85rem;
-  color: #555;
+  font-weight: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.control .value {
+  color: var(--ink-muted);
+  font-weight: 400;
 }
 
 .control .hint {
-  color: #999;
-  font-weight: normal;
+  font-size: 0.78rem;
+  color: var(--ink-muted);
 }
 
-#connection-status {
-  font-size: 0.8rem;
-  color: #888;
+select,
+input[type="range"] {
+  font: inherit;
+  accent-color: var(--structural);
 }
+
+select {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  padding: 7px 10px;
+  border-radius: 2px;
+}
+
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--structural);
+  outline-offset: 2px;
+}
+
+/* --- Dashboard ------------------------------------------------------------ */
 
 .dashboard {
-  margin-top: 32px;
-  max-width: 900px;
+  margin-top: 48px;
+  border-top: 1px solid var(--line);
+  padding-top: 32px;
 }
 
 .totals {
   display: flex;
-  gap: 32px;
-  margin: 0 0 24px;
+  gap: 40px;
+  flex-wrap: wrap;
+  margin: 0 0 32px;
+  padding: 0;
 }
 
 #totals-single.hidden {
   display: none;
 }
 
+.total dt {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  margin: 0 0 4px;
+}
+
+.total dd {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 500;
+}
+
+.total-near-miss dd {
+  color: var(--status-near-miss);
+}
+
 .totals-split {
   display: none;
-  gap: 48px;
-  margin: 0 0 24px;
+  gap: 56px;
+  flex-wrap: wrap;
+  margin: 0 0 32px;
 }
 
 .totals-split.active {
@@ -100,42 +286,27 @@ h1 {
 }
 
 .totals-column h4 {
-  font-size: 0.8rem;
-  margin: 0 0 4px;
-  color: #555;
+  font-size: 0.78rem;
+  font-weight: 500;
+  margin: 0 0 8px;
+  color: var(--ink-muted);
 }
 
 .totals-column .totals {
   margin: 0;
-  gap: 24px;
-}
-
-.total dt {
-  font-size: 0.8rem;
-  color: #555;
-}
-
-.total dd {
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 700;
-}
-
-/* Near-misses get their own color — not red, so they read as distinct from a caught
-   conflict (see tasks/staleness-finding.md's near-miss definition). */
-.total-near-miss dd {
-  color: #9b3fd6;
+  gap: 28px;
 }
 
 .charts {
   display: flex;
-  gap: 24px;
+  gap: 32px;
   flex-wrap: wrap;
 }
 
 .chart-box {
   flex: 1 1 380px;
   height: 260px;
-  border: 1px solid #eee;
-  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: 16px;
 }

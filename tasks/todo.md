@@ -22,4 +22,4 @@ Flat checklist view of `tasks/plan.md`, in dependency order. Parallel pairs note
 - [x] **Task 9** — Chart.js dashboard + density/stress control (Phase 5.2 + 5.6)
 - [x] **Task 10** — Split-screen mode (Phase 5.3)
 - [x] **Task 11** — Broadcast-lag control (Phase 5 amendment)
-- [ ] **Task 12** — Visual design pass (Phase 5.8)
+- [x] **Task 12** — Visual design pass (Phase 5.8)

@@ -40,6 +40,28 @@ def test_confirm_check_log_shape():
     assert total_conflicts_avoided <= total_checks
 
 
+def test_per_robot_tracking_for_task_12_markers():
+    # outstanding_robot_ids and claimed_robot_ids_this_tick back the per-robot
+    # yellow/red markers (Task 12) — a count alone can't say *which* robot to flash.
+    sim = Simulator(grid_size=20, robot_count=15, seed=1, naive_mode=True)
+
+    saw_outstanding = False
+    saw_claimed = False
+    for _ in range(200):
+        sim.step()
+        outstanding = sim.coordinator.outstanding_robot_ids
+        claimed = sim.coordinator.claimed_robot_ids_this_tick
+        assert len(outstanding) == len(set(outstanding))  # no duplicate robot ids
+        assert len(claimed) == len(set(claimed))
+        assert all(0 <= rid < 15 for rid in outstanding)
+        assert all(0 <= rid < 15 for rid in claimed)
+        saw_outstanding = saw_outstanding or bool(outstanding)
+        saw_claimed = saw_claimed or bool(claimed)
+
+    assert saw_outstanding, "expected at least one tick with an outstanding request"
+    assert saw_claimed, "expected at least one tick with a claimed (conflict) resolution"
+
+
 def test_queue_depth_rises_under_density():
     ticks = 500
     grid_size = 30

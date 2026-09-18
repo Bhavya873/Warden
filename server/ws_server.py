@@ -8,7 +8,8 @@ so keep additions backward-compatible (new keys, not renamed/removed ones):
 Single mode ("naive" | "warden"):
     {"type": "tick", "grid_size": int, "mode": "naive" | "warden",
      "tick": int, "robot_count": int, "broadcast_lag": "normal"|"degraded"|"adversarial",
-     "robots": [{"id": int, "x": int, "y": int, "dx": int, "dy": int, "near_miss": bool}, ...],
+     "robots": [{"id": int, "x": int, "y": int, "dx": int, "dy": int, "near_miss": bool,
+                 "outcome": "moved" | "waiting" | "conflict" | "idle"}, ...],
      "stats": {"instant_moves": int, "confirmed_checks": int, "conflicts_avoided": int,
                "near_misses": int, "queue_depth": int, "near_miss_count_total": int},
      "totals": {"instant_moves": int, "confirmed_checks": int, "conflicts_avoided": int,
@@ -17,7 +18,13 @@ Single mode ("naive" | "warden"):
      and near_miss/near_misses are always 0/false there too, since staleness is a
      Warden-filter concept — see tasks/staleness-finding.md. "totals" are cumulative
      since the current mode was selected — a mode switch resets them, since it's a
-     fresh coordinator; a robot-count change does not.)
+     fresh coordinator; a robot-count change does not. `outcome` is the color-coding
+     from the original design doc's demo spec — green="moved" (this tick, either
+     instant or after a cleared confirm-check), yellow="waiting" (an in-flight confirm-
+     check), red="conflict" (a confirm-check just resolved "claimed" for this robot),
+     and "idle" (default/neutral) for a robot sitting at its current target. `outcome`
+     is a snapshot of this one tick, not an animation — it doesn't try to represent a
+     multi-tick "ping traveling" state beyond "currently waiting".)
 
 Split mode — two independent worlds, same seed, run in lockstep, each mirroring the
 single-mode "board" shape above (tick/robot_count/robots/stats/totals) under its label:
@@ -202,6 +209,21 @@ class SimulationServer:
     def _serialize_board(self, sim: Simulator, board_mode: str, before: dict, totals: dict) -> dict:
         world = sim.world
         near_miss_ids = set(world.near_miss_robot_ids)
+        claimed_ids = set(sim.coordinator.claimed_robot_ids_this_tick) if sim.coordinator is not None else set()
+        outstanding_ids = set(sim.coordinator.outstanding_robot_ids) if sim.coordinator is not None else set()
+
+        def _outcome(robot_id: int, moved: bool) -> str:
+            # Priority matters: a robot whose request just resolved "claimed" this tick
+            # is "conflict" even though it also isn't moving; a robot that moved is
+            # "moved" even if it still shows up in `outstanding` from a stale read.
+            if robot_id in claimed_ids:
+                return "conflict"  # red
+            if moved:
+                return "moved"  # green
+            if robot_id in outstanding_ids:
+                return "waiting"  # yellow
+            return "idle"
+
         robots = [
             {
                 "id": robot.robot_id,
@@ -210,6 +232,10 @@ class SimulationServer:
                 "dx": robot.x - before.get(robot.robot_id, (robot.x, robot.y))[0],
                 "dy": robot.y - before.get(robot.robot_id, (robot.x, robot.y))[1],
                 "near_miss": robot.robot_id in near_miss_ids,
+                "outcome": _outcome(
+                    robot.robot_id,
+                    moved=(robot.x, robot.y) != before.get(robot.robot_id, (robot.x, robot.y)),
+                ),
             }
             for robot in world.robots
         ]

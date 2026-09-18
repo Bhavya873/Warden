@@ -2,13 +2,30 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Warden</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h1>Warden</h1>
-  <div class="layout">
-    <div class="floor-area">
+  <header class="console-header">
+    <div class="title-block">
+      <h1>Warden</h1>
+      <p class="tagline">Collision-free zone claiming for a warehouse robot fleet</p>
+    </div>
+    <div class="header-status">
+      <span id="connection-text">connecting&hellip;</span>
+      <span id="stat-tick" class="mono"></span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="floor-area">
       <canvas id="floor" width="600" height="600"></canvas>
       <div id="split-floors" class="split-floors">
         <div class="split-floor">
@@ -20,8 +37,15 @@
           <canvas id="floor-warden" width="380" height="380"></canvas>
         </div>
       </div>
-    </div>
-    <div class="controls">
+      <ul class="legend">
+        <li><span class="swatch swatch-moved"></span>Moved</li>
+        <li><span class="swatch swatch-waiting"></span>Waiting on a confirm-check</li>
+        <li><span class="swatch swatch-conflict"></span>Conflict avoided</li>
+        <li><span class="swatch swatch-near-miss"></span>Near-miss (ring)</li>
+      </ul>
+    </section>
+
+    <aside class="controls">
       <div class="control">
         <label for="mode">Mode</label>
         <select id="mode">
@@ -32,47 +56,46 @@
       </div>
       <div class="control">
         <label for="robot-count">
-          Robots: <span id="robot-count-value">20</span>
-          <span class="hint">(drag to the high end for a density stress test)</span>
+          Robots <span class="mono value" id="robot-count-value">20</span>
         </label>
         <input id="robot-count" type="range" min="1" max="150" value="20" />
+        <span class="hint">Drag to the high end for a density stress test</span>
       </div>
       <div class="control">
-        <label for="grid-size">Grid size: <span id="grid-size-value">30</span></label>
+        <label for="grid-size">
+          Grid size <span class="mono value" id="grid-size-value">30</span>
+        </label>
         <input id="grid-size" type="range" min="10" max="40" value="30" />
       </div>
       <div class="control">
-        <label for="broadcast-lag">
-          Broadcast lag
-          <span class="hint">(Warden filter refresh interval — no effect in Naive mode)</span>
-        </label>
+        <label for="broadcast-lag">Broadcast lag</label>
         <select id="broadcast-lag">
           <option value="normal">Normal</option>
           <option value="degraded">Degraded</option>
           <option value="adversarial">Adversarial</option>
         </select>
+        <span class="hint">Warden's filter refresh interval — no effect in Naive mode</span>
       </div>
-      <p id="connection-status"><span id="connection-text">connecting&hellip;</span> <span id="stat-tick"></span></p>
-    </div>
-  </div>
+    </aside>
+  </main>
 
-  <div class="dashboard">
+  <section class="dashboard">
     <dl class="totals" id="totals-single">
       <div class="total">
         <dt>Total moves</dt>
-        <dd id="total-moves">0</dd>
+        <dd class="mono" id="total-moves">0</dd>
       </div>
       <div class="total">
         <dt>Total confirm-checks</dt>
-        <dd id="total-confirmed">0</dd>
+        <dd class="mono" id="total-confirmed">0</dd>
       </div>
       <div class="total">
         <dt>Total conflicts avoided</dt>
-        <dd id="total-conflicts">0</dd>
+        <dd class="mono" id="total-conflicts">0</dd>
       </div>
       <div class="total total-near-miss">
         <dt>Total near-misses</dt>
-        <dd id="total-near-misses">0</dd>
+        <dd class="mono" id="total-near-misses">0</dd>
       </div>
     </dl>
 
@@ -80,19 +103,19 @@
       <div class="totals-column">
         <h4>Naive</h4>
         <dl class="totals">
-          <div class="total"><dt>Moves</dt><dd id="split-naive-total-moves">0</dd></div>
-          <div class="total"><dt>Confirmed</dt><dd id="split-naive-total-confirmed">0</dd></div>
-          <div class="total"><dt>Conflicts avoided</dt><dd id="split-naive-total-conflicts">0</dd></div>
-          <div class="total total-near-miss"><dt>Near-misses</dt><dd id="split-naive-total-near-misses">0</dd></div>
+          <div class="total"><dt>Moves</dt><dd class="mono" id="split-naive-total-moves">0</dd></div>
+          <div class="total"><dt>Confirmed</dt><dd class="mono" id="split-naive-total-confirmed">0</dd></div>
+          <div class="total"><dt>Conflicts avoided</dt><dd class="mono" id="split-naive-total-conflicts">0</dd></div>
+          <div class="total total-near-miss"><dt>Near-misses</dt><dd class="mono" id="split-naive-total-near-misses">0</dd></div>
         </dl>
       </div>
       <div class="totals-column">
         <h4>Warden</h4>
         <dl class="totals">
-          <div class="total"><dt>Moves</dt><dd id="split-warden-total-moves">0</dd></div>
-          <div class="total"><dt>Confirmed</dt><dd id="split-warden-total-confirmed">0</dd></div>
-          <div class="total"><dt>Conflicts avoided</dt><dd id="split-warden-total-conflicts">0</dd></div>
-          <div class="total total-near-miss"><dt>Near-misses</dt><dd id="split-warden-total-near-misses">0</dd></div>
+          <div class="total"><dt>Moves</dt><dd class="mono" id="split-warden-total-moves">0</dd></div>
+          <div class="total"><dt>Confirmed</dt><dd class="mono" id="split-warden-total-confirmed">0</dd></div>
+          <div class="total"><dt>Conflicts avoided</dt><dd class="mono" id="split-warden-total-conflicts">0</dd></div>
+          <div class="total total-near-miss"><dt>Near-misses</dt><dd class="mono" id="split-warden-total-near-misses">0</dd></div>
         </dl>
       </div>
     </div>
@@ -105,7 +128,7 @@
         <canvas id="load-chart"></canvas>
       </div>
     </div>
-  </div>
+  </section>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="grid_view.js"></script>

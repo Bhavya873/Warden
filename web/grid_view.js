@@ -6,6 +6,20 @@
 const WS_URL = "ws://localhost:8765";
 const LOAD_CHART_WINDOW = 150; // ticks of history kept for the rolling line chart
 
+// Mirrors the custom properties in style.css — kept in sync by hand, small enough not
+// to warrant a shared token pipeline between CSS and canvas/Chart.js drawing code.
+const COLORS = {
+  line: "#ccd4db",
+  ink: "#1b222c",
+  inkMuted: "#62707d",
+  structural: "#33455c", // Warden series in split charts
+  accentNaive: "#c9682e", // Naive series in split charts
+  moved: "#2e9e4f",
+  waiting: "#c98a12",
+  conflict: "#d64545",
+  nearMiss: "#8b3fc9",
+};
+
 const floorCanvas = document.getElementById("floor");
 const floorCtx = floorCanvas.getContext("2d");
 const splitFloors = document.getElementById("split-floors");
@@ -75,7 +89,7 @@ function createSingleCharts() {
           data: [0, 0, 0, 0],
           // Near-misses use purple, not red — a near-miss is the filter/coordinator
           // being wrong, not a correctly-caught conflict (tasks/staleness-finding.md).
-          backgroundColor: ["#2fa84f", "#e0b400", "#d64545", "#9b3fd6"],
+          backgroundColor: [COLORS.moved, COLORS.waiting, COLORS.conflict, COLORS.nearMiss],
         },
       ],
     },
@@ -95,7 +109,7 @@ function createSingleCharts() {
         {
           label: "Coordinator queue depth",
           data: [],
-          borderColor: "#2f6fed",
+          borderColor: COLORS.structural,
           backgroundColor: "transparent",
           pointRadius: 0,
           tension: 0.2,
@@ -121,8 +135,8 @@ function createSplitCharts() {
     data: {
       labels: ["Instant", "Confirmed", "Conflicts avoided", "Near-misses"],
       datasets: [
-        { label: "Naive", data: [0, 0, 0, 0], backgroundColor: "#e0824a" },
-        { label: "Warden", data: [0, 0, 0, 0], backgroundColor: "#2f6fed" },
+        { label: "Naive", data: [0, 0, 0, 0], backgroundColor: COLORS.accentNaive },
+        { label: "Warden", data: [0, 0, 0, 0], backgroundColor: COLORS.structural },
       ],
     },
     options: {
@@ -141,7 +155,7 @@ function createSplitCharts() {
         {
           label: "Naive queue depth",
           data: [],
-          borderColor: "#e0824a",
+          borderColor: COLORS.accentNaive,
           backgroundColor: "transparent",
           pointRadius: 0,
           tension: 0.2,
@@ -149,7 +163,7 @@ function createSplitCharts() {
         {
           label: "Warden queue depth",
           data: [],
-          borderColor: "#2f6fed",
+          borderColor: COLORS.structural,
           backgroundColor: "transparent",
           pointRadius: 0,
           tension: 0.2,
@@ -187,7 +201,7 @@ function connect() {
   });
 
   socket.addEventListener("close", () => {
-    connectionText.textContent = "disconnected — retrying…";
+    connectionText.textContent = "disconnected, retrying…";
     setTimeout(connect, 1000);
   });
 
@@ -290,12 +304,21 @@ function renderSplit(state) {
 
 // --- Shared floor drawing -------------------------------------------------
 
+// robot.outcome -> fill color. "idle" (sitting at its current target, nothing pending)
+// stays a quiet neutral so the three active states read clearly against it.
+const OUTCOME_COLORS = {
+  moved: COLORS.moved,
+  waiting: COLORS.waiting,
+  conflict: COLORS.conflict,
+  idle: COLORS.inkMuted,
+};
+
 function drawFloor(ctx, canvas, gridSize, robots) {
   const cellSize = canvas.width / gridSize;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  ctx.strokeStyle = "#ddd";
+  ctx.strokeStyle = COLORS.line;
   ctx.lineWidth = 1;
   for (let i = 0; i <= gridSize; i++) {
     const p = i * cellSize;
@@ -315,14 +338,17 @@ function drawFloor(ctx, canvas, gridSize, robots) {
     const cx = robot.x * cellSize + cellSize / 2;
     const cy = robot.y * cellSize + cellSize / 2;
 
-    ctx.fillStyle = "#2f6fed";
-    ctx.strokeStyle = "#1a3f99";
-    ctx.lineWidth = 2;
+    ctx.fillStyle = OUTCOME_COLORS[robot.outcome] || COLORS.inkMuted;
+    ctx.strokeStyle = COLORS.ink;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
 
     if (robot.dx !== 0 || robot.dy !== 0) {
+      ctx.strokeStyle = COLORS.ink;
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       ctx.lineTo(cx + robot.dx * radius * 1.6, cy + robot.dy * radius * 1.6);
@@ -332,7 +358,7 @@ function drawFloor(ctx, canvas, gridSize, robots) {
     // Near-miss: the filter/coordinator approved this move but ground truth caught it —
     // a distinct ring, not red, so it isn't mistaken for a caught conflict.
     if (robot.near_miss) {
-      ctx.strokeStyle = "#9b3fd6";
+      ctx.strokeStyle = COLORS.nearMiss;
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(cx, cy, radius * 1.8, 0, Math.PI * 2);

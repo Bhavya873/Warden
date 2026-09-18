@@ -4,32 +4,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-This repository currently contains only a design document and a README — no implementation exists yet. There is no build system, no dependencies, no lint config, and no tests to run. When code is added, this file should be updated with the actual commands (build/lint/test/run a single test) and any structure that spans multiple files.
+Implementation in progress, built incrementally against `tasks/plan.md` / `tasks/todo.md` (which break down `Warden — Build Spec.md`, the authoritative spec — read it before implementing anything not covered here). Check `tasks/todo.md` for what's done and what's next.
 
-## What this project is
+## Commands
 
-Warden is a collision-free zone-claiming scheme for coordinating a fleet of warehouse robots sharing one floor grid. The full design rationale, architecture, and demo spec live in `Warden — Collision-Free Zone Claiming for Warehouse Robot Fleets.md` — read that file before implementing anything here, since the details below are only a summary.
+```bash
+# one-time setup
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+source "$HOME/.cargo/env"   # if rustup was just installed
+(cd core-rs && maturin develop)   # builds the Rust extension and installs it into .venv
 
-### Core idea
+# everyday
+pytest                       # full suite (Python + the PyO3-exposed Rust modules)
+pytest tests/test_grid_world.py -v   # a single file
+cargo test                   # from core-rs/: Rust-only unit tests (ribbon_filter, ring_buffer)
+python -m sim.scenarios      # full benchmark harness; writes results/benchmark_results.csv + coordinator_load.png
+```
 
-Before a robot enters a grid cell, it must know whether another robot is about to occupy it — without asking every robot (or a central coordinator) on every single move, which floods the network. The design exploits the fact that most moves are uncontested, so the system should pay almost no cost in the common case and only pay for a real network check when there's genuine chance of conflict.
+After editing any `.rs` file under `core-rs/src/`, rerun `maturin develop` before the next `pytest` — the Python side imports a compiled extension, not the source.
 
-### Architecture (two-tier fast-reject-then-confirm)
+## Architecture
 
-1. **Per-robot Ribbon filter** — a local, in-memory approximate membership structure representing "cells I believe are currently claimed by another robot." Zero false negatives (never misses a real claim), but can have false positives ("maybe claimed" when actually free). Kept fresh via periodic broadcast from every robot announcing cells it occupies or is about to enter.
-2. **Coordinator-held ring buffer** — the exact ground truth: currently-claimed cells, each with a short expiry so claims fall off automatically as robots move on. Fixed-size, O(1) insert/evict, bounded memory regardless of fleet size.
+Two-tier fast-reject-then-confirm collision avoidance, per the build spec: a per-robot Ribbon filter (`core-rs/src/ribbon_filter.rs`, wraps the `ribbon-filter` crate rather than reimplementing the SIGMOD 2021 banded-matrix construction) for the fast "maybe claimed" check, and a coordinator-held ring buffer (`core-rs/src/ring_buffer.rs`, hand-written) as exact ground truth. Both are exposed to Python via PyO3 (`core-rs/src/lib.rs`) as `warden_core.RibbonFilter` / `warden_core.RingBuffer`.
 
-Decision flow per move:
-- Local filter says **definitely free** → proceed immediately, no network call (the overwhelming majority of moves).
-- Local filter says **maybe claimed** → only then send a confirm-check to the coordinator (or the robot believed to hold the cell) before proceeding.
+**Python side, by layer:**
+- `core/grid_world.py` — the shared physics: NxN grid, greedy movement, and the ground-truth collision guarantee. `GridWorld.tick(policy=None)` takes an optional move-gating hook (`policy.can_move(robot, next_cell) -> bool`) so Naive and Warden modes share identical movement logic; the live occupancy check inside `tick()` is always the final authority regardless of what a policy says. Also owns the anti-deadlock escalation (`AXIS_FLIP_THRESHOLD_TICKS`, `RANDOM_ESCAPE_THRESHOLD_TICKS`) — greedy single-axis movement with no escape hatch provably deadlocks the whole fleet (see git history on `core/grid_world.py` / `tests/test_no_permanent_gridlock`), so this isn't optional.
+- `core/coordinator.py` — `Coordinator` (naive mode: gates every move through a simulated 1–3 tick confirm-check round trip against the ring buffer) and `WardenCoordinator` (wraps `Coordinator`; local filter says free → instant move; filter says maybe → delegates to the wrapped `Coordinator`). Both are duck-typed `GridWorld` policies.
+- `sim/simulator.py` — drives the tick loop; `naive_mode=True` / `warden_mode=True` pick the policy.
+- `sim/scenarios.py` — the density-preset benchmark harness (`python -m sim.scenarios`).
+- `core/robot.py` — the shared `Robot` dataclass (position, target, `consecutive_blocked_ticks`).
 
-This mirrors the fast-reject-then-confirm pattern from prior duplicate-detection work (referenced in the doc as the PRP duplicate-packet and Tesla perception-dedup projects): the exact structure (ring buffer) only has to answer the rare "maybe" case; the approximate structure (Ribbon filter) absorbs nearly all traffic.
+**Key invariant:** the Ribbon filter must never produce a false negative — that's what `tests/test_ribbon_filter.py::test_no_false_negatives` and `tests/test_no_permanent_gridlock`/`test_no_collisions_*` exist to guard. Filter *staleness* (a robot's local filter being out of date) is a different, accepted risk — see `tasks/staleness-finding.md` for why it can't actually cause a collision in this simulation (the live occupancy check has no propagation delay of its own) and what a "near-miss" means as a result.
 
-### Demo requirements (from the design doc)
-
-The intended demo is a visual warehouse floor-grid simulation with:
-- Robots as moving dots, color-flashed per move: green (filter said free, no network call), yellow (filter said maybe, confirm round-trip shown), red (confirm found a real conflict, one robot waits).
-- Live counters: instant moves vs. confirmed checks vs. conflicts avoided.
-- A robot-density slider and a toggleable "naive mode" (every move confirmed over the network, no filter) for a side-by-side comparison showing Warden staying mostly green under load while naive mode floods the coordinator.
-
-When implementing, treat the correctness invariant as non-negotiable: the Ribbon filter must never produce a false negative (a claimed cell reported as free), since that's the one failure mode that causes an actual collision. False positives (unnecessary confirm-checks) are acceptable and expected.
+`tasks/benchmark-findings.md` has the measured (not estimated) traffic-reduction and CPU figures, including where they diverge from the project's original aspirational framing — read it before quoting a number from this project anywhere.

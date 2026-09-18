@@ -148,6 +148,13 @@ class WardenCoordinator:
         self.instant_moves_this_tick = 0
         self.log: list[dict] = []
 
+    @property
+    def confirm_check_log(self) -> list[dict]:
+        """The wrapped Coordinator's own per-tick log (tick, confirm_checks,
+        queue_depth, avg_delay) — lets callers read Warden's queue-depth series with
+        the same shape as naive mode's, for an apples-to-apples benchmark comparison."""
+        return self._coordinator.log
+
     def can_move(self, robot, next_cell: Cell) -> bool:
         if not self._filter.contains(next_cell):
             self.instant_moves_this_tick += 1

@@ -15,7 +15,7 @@ Flat checklist view of `tasks/plan.md`, in dependency order. Parallel pairs note
 - [x] **Task 5** — Warden mode end-to-end (Phase 3 core)
 - [x] **Task 6** — Adversarial staleness test + documented finding (Phase 3 amendment)
 - [ ] **Checkpoint 4** — review staleness finding, decide Task 11's design (after Task 6) — most important checkpoint
-- [ ] **Task 7** — Benchmark harness (Phase 4)
+- [x] **Task 7** — Benchmark harness (Phase 4)
 - [ ] **Checkpoint 5** — sanity-check headline figures are measured, not estimated (after Task 7)
 - [ ] **Task 8** — Floor renderer + robot-count slider + mode toggle (Phase 5.1)
 - [ ] **Checkpoint 6** — confirm WS schema stable before Tasks 10/11 (after Task 8)

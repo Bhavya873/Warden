@@ -171,10 +171,14 @@ body {
 }
 
 .abstract {
+  /* VT323: a CRT-terminal face, single weight (400) only. It reads smaller than its
+     font-size suggests (thin strokes, tall x-height), so it's bumped up a size and
+     given extra line-height here rather than reusing the base paragraph scale. */
+  font-family: "VT323", var(--font-mono), monospace;
   margin: 12px 0 0;
   color: var(--muted-foreground);
-  font-size: 0.88rem;
-  line-height: 1.55;
+  font-size: 1.15rem;
+  line-height: 1.6;
 }
 
 .header-status {

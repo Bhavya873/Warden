@@ -31,7 +31,7 @@
     <p class="abstract">
       <strong class="abstract-label">How It Works:</strong> Each robot keeps a small local Ribbon filter
       that instantly confirms a cell is free, or flags it as possibly occupied. Only the uncertain cases
-      go to the server, which checks its ring buffer — the authoritative record of currently claimed
+      go to the server, which checks its ring buffer, the authoritative record of currently claimed
       cells — and makes the final call.
     </p>
     <p class="abstract">
@@ -42,13 +42,13 @@
     </p>
     <p class="abstract">
       <strong class="abstract-label">Benefits:</strong> With most cells empty most of the time, Warden
-      cuts network traffic and speeds up the common case — robots keep moving without waiting on the
+      cuts network traffic and speeds up the common case, where robots keep moving without waiting on the
       server. Safety doesn't depend on the filter: the server still resolves every uncertain case before a
       robot moves into a cell that might be occupied.
     </p>
     <p class="abstract">
-      <strong class="abstract-label">Tradeoffs:</strong> A false positive — the filter flagging a free
-      cell as maybe-occupied — costs an extra server request, shrinking the win. Warden also assumes
+      <strong class="abstract-label">Tradeoffs:</strong> A false positive, when the filter flags a free
+      cell as maybe-occupied, costs an extra server request, shrinking the benefit. Warden also assumes
       occupancy doesn't change too fast: the busier the warehouse, the more filter refreshes and server
       checks it needs.
     </p>

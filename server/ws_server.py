@@ -451,17 +451,20 @@ class SimulationServer:
             self.clients.discard(websocket)
 
     async def broadcast_loop(self) -> None:
+        # ponytail: only steps the sim while someone's actually connected -- no clients,
+        # no CPU spent computing frames nobody sees. The world simply holds still and
+        # picks up from the same tick whenever the next viewer connects.
         while True:
-            if not self.paused:
-                self._last_state = self.step_and_serialize()
-            if self._last_state is not None:
-                # Keep this fresh every tick, even while paused and not re-stepping —
-                # otherwise a client sees a cached "paused: false" for one tick after
-                # actually pausing, since step_and_serialize() is what normally sets it.
-                self._last_state["paused"] = self.paused
-            if self.clients and self._last_state is not None:
-                payload = json.dumps(self._last_state)
-                await asyncio.gather(*(client.send(payload) for client in self.clients), return_exceptions=True)
+            if self.clients:
+                if not self.paused:
+                    self._last_state = self.step_and_serialize()
+                if self._last_state is not None:
+                    # Keep this fresh every tick, even while paused and not re-stepping —
+                    # otherwise a client sees a cached "paused: false" for one tick after
+                    # actually pausing, since step_and_serialize() is what normally sets it.
+                    self._last_state["paused"] = self.paused
+                    payload = json.dumps(self._last_state)
+                    await asyncio.gather(*(client.send(payload) for client in self.clients), return_exceptions=True)
             await asyncio.sleep(TICK_INTERVAL_SECONDS)
 
 

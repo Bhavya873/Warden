@@ -236,12 +236,23 @@ def test_set_robot_count_applies_to_both_boards_in_split_mode():
     assert len(server.split_sims["warden"].world.robots) == 40
 
 
+class _StubClient:
+    """A minimal stand-in for a connected websocket -- just enough for
+    broadcast_loop's `self.clients` / `client.send(...)` to treat it as a viewer,
+    without opening a real socket."""
+
+    async def send(self, payload):
+        pass
+
+
 def test_set_paused_stops_ticking_in_the_real_broadcast_loop():
     # Exercises the actual broadcast_loop coroutine (not a reimplementation of its
     # logic) so this fails if the real pause-handling code path breaks, not just a
-    # test double of it.
+    # test double of it. Needs a (stub) connected client -- broadcast_loop only steps
+    # the sim when someone's listening, see test_idle_server_does_not_tick below.
     async def body():
         server = SimulationServer()
+        server.clients.add(_StubClient())
         loop_task = asyncio.ensure_future(server.broadcast_loop())
         try:
             await asyncio.sleep(0.35)  # a few ticks at TICK_INTERVAL_SECONDS=0.1
@@ -258,6 +269,29 @@ def test_set_paused_stops_ticking_in_the_real_broadcast_loop():
             await asyncio.sleep(0.35)
             tick_after_resume = server._last_state["boards"]["naive"]["tick"]
             assert tick_after_resume > tick_at_pause, "never resumed"
+        finally:
+            loop_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await loop_task
+
+    asyncio.run(body())
+
+
+def test_idle_server_does_not_tick():
+    # The whole point: no connected clients means broadcast_loop must not spend CPU
+    # stepping the sim, since nobody's watching. It should also pick up cleanly the
+    # moment a client shows up, rather than needing a reset.
+    async def body():
+        server = SimulationServer()
+        loop_task = asyncio.ensure_future(server.broadcast_loop())
+        try:
+            await asyncio.sleep(0.35)  # a few ticks at TICK_INTERVAL_SECONDS=0.1
+            assert server._last_state is None, "ticked with no clients connected"
+
+            server.clients.add(_StubClient())
+            await asyncio.sleep(0.35)
+            assert server._last_state is not None, "never started ticking once a client joined"
+            assert server._last_state["boards"]["naive"]["tick"] > 0
         finally:
             loop_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):

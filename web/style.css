@@ -45,12 +45,12 @@
   --brutal-border: 3px;
   --brutal-shadow-offset: 5px;
 
-  /* Space Grotesk + Space Mono: a pairing designed by the same foundry to be used
-     together, with real character (distinctive geometric quirks, tall ascenders) —
-     not the neutral corporate grotesque (Inter/Source Sans/IBM Plex) that's become the
-     reflexive "safe" default everywhere, AI-generated pages included. Also suits the
-     bold/blocky neobrutalist look better than a neutral sans would. */
-  --font-sans: "Space Grotesk", system-ui, sans-serif;
+  /* Silkscreen: a pixel/bitmap display face, built on a coarse grid rather than smooth
+     curves — a deliberately loud, retro-tech choice for a page about robots on a grid.
+     Ships in 400/700 only, and loses detail below ~13-14px, so the smallest captions on
+     the page are the one place legibility is genuinely traded for character here. Space
+     Mono stays for numeric data, unchanged — a pixel face isn't built for tabular digits. */
+  --font-sans: "Silkscreen", system-ui, sans-serif;
   --font-mono: "Space Mono", ui-monospace, monospace;
 }
 
@@ -366,7 +366,7 @@ body {
 
 .control label {
   font-size: 0.85rem;
-  font-weight: 500;
+  font-weight: 400; /* Silkscreen ships 400/700 only */
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -393,7 +393,7 @@ select {
   padding: 0 12px;
   border-radius: var(--radius);
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 700; /* Silkscreen ships 400/700 only */
   box-shadow: var(--brutal-shadow-offset) var(--brutal-shadow-offset) 0 var(--foreground);
   transition: border-color 120ms ease;
 }

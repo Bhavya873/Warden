@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Implementation in progress, built incrementally against `tasks/plan.md` / `tasks/todo.md` (which break down `Warden — Build Spec.md`, the authoritative spec — read it before implementing anything not covered here). Check `tasks/todo.md` for what's done and what's next.
+Complete. All planned phases (grid world, naive coordinator, Warden filter path, benchmark harness, live visualization) are built and tested. See `README.md` for how to run it and what it demonstrates.
 
 ## Commands
 
@@ -35,6 +35,6 @@ Two-tier fast-reject-then-confirm collision avoidance, per the build spec: a per
 - `sim/scenarios.py` — the density-preset benchmark harness (`python -m sim.scenarios`).
 - `core/robot.py` — the shared `Robot` dataclass (position, target, `consecutive_blocked_ticks`).
 
-**Key invariant:** the Ribbon filter must never produce a false negative — that's what `tests/test_ribbon_filter.py::test_no_false_negatives` and `tests/test_no_permanent_gridlock`/`test_no_collisions_*` exist to guard. Filter *staleness* (a robot's local filter being out of date) is a different, accepted risk — see `tasks/staleness-finding.md` for why it can't actually cause a collision in this simulation (the live occupancy check has no propagation delay of its own) and what a "near-miss" means as a result.
+**Key invariant:** the Ribbon filter must never produce a false negative — that's what `tests/test_ribbon_filter.py::test_no_false_negatives` and `tests/test_no_permanent_gridlock`/`test_no_collisions_*` exist to guard. Filter *staleness* (a robot's local filter being out of date) is a different, accepted risk — see `docs/staleness-finding.md` for why it can't actually cause a collision in this simulation (the live occupancy check has no propagation delay of its own) and what a "near-miss" means as a result.
 
-`tasks/benchmark-findings.md` has the measured (not estimated) traffic-reduction and CPU figures, including where they diverge from the project's original aspirational framing — read it before quoting a number from this project anywhere.
+`docs/benchmark-findings.md` has the measured (not estimated) traffic-reduction and CPU figures, including where they diverge from the project's original aspirational framing — read it before quoting a number from this project anywhere.

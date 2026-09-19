@@ -90,7 +90,7 @@ from core.coordinator import CAPACITY_MULTIPLIER, Coordinator, WardenCoordinator
 from sim.simulator import Simulator
 
 HOST = os.environ.get("WARDEN_HOST", "localhost")
-PORT = 8765
+PORT = int(os.environ.get("PORT", 8765))
 TICK_INTERVAL_SECONDS = 0.1
 
 MIN_ROBOT_COUNT = 1

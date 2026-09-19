@@ -65,10 +65,16 @@ Open `web/index.html` in a browser. The dashboard compares Warden with the basel
 
 ```bash
 docker build -t warden .
-docker run -p 8765:8765 warden
+docker run --name warden -p 8765:8765 warden
 ```
 
-Then open `web/index.html` as above.
+Open `http://localhost:8765` in a browser — the container serves the dashboard itself.
+
+Turn it off and remove everything (container + image):
+
+```bash
+docker rm -f warden && docker rmi warden
+```
 
 ## Tests and benchmarks
 

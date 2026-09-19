@@ -139,7 +139,7 @@ function makeSmoothedMax(seed) {
   };
 }
 
-const loadSmoothedMax = makeSmoothedMax(5);
+let loadSmoothedMax = makeSmoothedMax(5); // reassigned on reset — see resetBtn handler
 
 // --- WebSocket -----------------------------------------------------------
 
@@ -327,6 +327,17 @@ playPauseBtn.addEventListener("click", () => {
 
 resetBtn.addEventListener("click", () => {
   send({ action: "reset" });
+
+  // The server resets its own tick count to 0, but this rolling history is purely
+  // client-side — without clearing it, the sparkline and averages would keep showing
+  // pre-reset data mixed in with the new run until the 150-tick window scrolled past it.
+  loadChart.data.labels.length = 0;
+  loadChart.data.datasets[0].data.length = 0;
+  loadChart.data.datasets[1].data.length = 0;
+  loadSmoothedMax = makeSmoothedMax(5);
+  loadChart.update("none");
+  loadAvgNaiveEl.textContent = "avg 0";
+  loadAvgWardenEl.textContent = "avg 0";
 });
 
 broadcastLagSelect.addEventListener("change", () => {

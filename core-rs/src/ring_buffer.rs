@@ -1,6 +1,8 @@
 //! Fixed-capacity ring buffer of cell claims. Ground truth for `confirm_check`:
 //! always correct, at the cost of being too slow to query on every move.
 
+use std::collections::HashMap;
+
 use pyo3::prelude::*;
 
 pub type Cell = (i32, i32);
@@ -19,6 +21,16 @@ pub struct RingBuffer {
     slots: Vec<Option<Entry>>,
     write_head: usize,
     current_tick: u64,
+    // Secondary index: cell -> slot indices currently holding it. `slots` stays the
+    // source of truth for ordering/eviction; this only exists so is_claimed/release/
+    // claimed_cells don't have to scan every slot (fixed at MAX_ROBOT_COUNT * 4 = 4000
+    // regardless of how many robots are actually in play) on every call. At high
+    // contention that per-request O(capacity) scan was the dashboard's actual
+    // density-scaling bottleneck -- confirm-check volume grows with contention, and
+    // each one used to pay for a full 4000-slot scan. Usually holds 0-1 entries per
+    // cell (occasionally a couple, from a cell being re-claimed before its previous
+    // claim expired) -- never proportional to capacity.
+    index: HashMap<Cell, Vec<usize>>,
 }
 
 impl RingBuffer {
@@ -28,6 +40,16 @@ impl RingBuffer {
             slots: vec![None; capacity],
             write_head: 0,
             current_tick: 0,
+            index: HashMap::new(),
+        }
+    }
+
+    fn unindex(&mut self, cell: Cell, slot: usize) {
+        if let Some(indices) = self.index.get_mut(&cell) {
+            indices.retain(|&i| i != slot);
+            if indices.is_empty() {
+                self.index.remove(&cell);
+            }
         }
     }
 
@@ -36,25 +58,33 @@ impl RingBuffer {
     /// evicted regardless of its own remaining TTL.
     pub fn claim(&mut self, cell: Cell, robot_id: u32, ttl_ticks: u64) {
         let expiry_tick = self.current_tick + ttl_ticks;
-        self.slots[self.write_head] = Some(Entry {
+        let slot = self.write_head;
+        if let Some(old_entry) = self.slots[slot] {
+            self.unindex(old_entry.cell, slot);
+        }
+        self.slots[slot] = Some(Entry {
             cell,
             robot_id,
             expiry_tick,
         });
+        self.index.entry(cell).or_default().push(slot);
         self.write_head = (self.write_head + 1) % self.slots.len();
     }
 
     pub fn is_claimed(&self, cell: Cell) -> bool {
-        self.slots.iter().any(|slot| match slot {
+        let Some(indices) = self.index.get(&cell) else {
+            return false;
+        };
+        indices.iter().any(|&i| match self.slots[i] {
             Some(entry) => entry.cell == cell && entry.expiry_tick > self.current_tick,
             None => false,
         })
     }
 
     pub fn release(&mut self, cell: Cell) {
-        for slot in self.slots.iter_mut() {
-            if slot.is_some_and(|entry| entry.cell == cell) {
-                *slot = None;
+        if let Some(indices) = self.index.remove(&cell) {
+            for i in indices {
+                self.slots[i] = None;
             }
         }
     }
@@ -62,11 +92,10 @@ impl RingBuffer {
     /// All currently-claimed (non-expired) cells — used to broadcast ring-buffer contents
     /// to robots' local Ribbon filters.
     pub fn claimed_cells(&self) -> Vec<Cell> {
-        self.slots
-            .iter()
-            .filter_map(|slot| slot.as_ref())
-            .filter(|entry| entry.expiry_tick > self.current_tick)
-            .map(|entry| entry.cell)
+        self.index
+            .keys()
+            .copied()
+            .filter(|&cell| self.is_claimed(cell))
             .collect()
     }
 
@@ -74,9 +103,12 @@ impl RingBuffer {
     /// lookup, to keep `is_claimed`/`claimed_cells` cheap.
     pub fn tick(&mut self, current_tick: u64) {
         self.current_tick = current_tick;
-        for slot in self.slots.iter_mut() {
-            if slot.is_some_and(|entry| entry.expiry_tick <= current_tick) {
-                *slot = None;
+        for i in 0..self.slots.len() {
+            if let Some(entry) = self.slots[i] {
+                if entry.expiry_tick <= current_tick {
+                    self.slots[i] = None;
+                    self.unindex(entry.cell, i);
+                }
             }
         }
     }

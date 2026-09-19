@@ -112,6 +112,7 @@ const loadChart = new Chart(document.getElementById("load-chart"), {
       y: {
         display: true,
         beginAtZero: true,
+        max: 7, // ms -- capped so one rare slow tick can't blow out the whole axis
         grid: { display: false },
         ticks: { maxTicksLimit: 4, font: { size: 13 }, callback: (v) => `${v}ms` },
       },
@@ -139,24 +140,6 @@ function average(values) {
 function stepMs(board) {
   return board.stats.step_seconds * 1000;
 }
-
-// Chart.js's built-in auto-scaling recomputes the axis max every single tick, so a
-// value oscillating quickly makes the whole axis visibly snap back and forth. An
-// EMA-smoothed max grows fast (so real spikes are never clipped) but shrinks slowly
-// (so a brief dip doesn't yank the axis back down), which reads as a steady axis
-// instead of a jittery one. (Needed again now that this is an unbounded ms value, not
-// a percentage with a fixed 0-100 ceiling.)
-function makeSmoothedMax(seed) {
-  let current = seed;
-  return function smoothedMax(dataMax) {
-    const target = Math.max(dataMax * 1.15, seed);
-    const alpha = target > current ? 0.3 : 0.02;
-    current += (target - current) * alpha;
-    return current;
-  };
-}
-
-let loadSmoothedMax = makeSmoothedMax(1); // reassigned on reset — see resetBtn handler
 
 // --- WebSocket -----------------------------------------------------------
 
@@ -199,8 +182,6 @@ function render(state) {
     pushRolling(loadChart.data.datasets[0].data, stepMs(naive));
     pushRolling(loadChart.data.datasets[1].data, stepMs(warden));
     pushRolling(loadChart.data.labels, naive.tick); // both boards are stepped together, one shared timeline
-    const loadDataMax = Math.max(...loadChart.data.datasets[0].data, ...loadChart.data.datasets[1].data);
-    loadChart.options.scales.y.max = loadSmoothedMax(loadDataMax);
     loadChart.update("none");
     loadAvgNaiveEl.textContent = `${average(loadChart.data.datasets[0].data).toFixed(2)}ms`;
     loadAvgWardenEl.textContent = `${average(loadChart.data.datasets[1].data).toFixed(2)}ms`;
@@ -359,7 +340,6 @@ resetBtn.addEventListener("click", () => {
   loadChart.data.labels.length = 0;
   loadChart.data.datasets[0].data.length = 0;
   loadChart.data.datasets[1].data.length = 0;
-  loadSmoothedMax = makeSmoothedMax(1);
   loadChart.update("none");
   loadAvgNaiveEl.textContent = "0.00ms";
   loadAvgWardenEl.textContent = "0.00ms";

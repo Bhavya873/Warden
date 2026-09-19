@@ -4,7 +4,7 @@ import json
 
 import websockets
 
-from server.ws_server import MAX_ROBOT_COUNT, SimulationServer
+from server.ws_server import MAX_GRID_SIZE, MAX_ROBOT_COUNT, SimulationServer
 
 
 def test_step_and_serialize_shape():
@@ -118,6 +118,10 @@ def test_set_robot_count_add_and_remove():
     server.set_robot_count(5)
     assert len(server.sim.world.robots) == 5
 
+    # Needs a grid big enough to actually hold MAX_ROBOT_COUNT robots — the default
+    # grid_size (30x30 = 900 cells) is smaller than MAX_ROBOT_COUNT (1000), which would
+    # cap this at the grid's capacity instead of testing the robot-count clamp itself.
+    server.set_grid_size(MAX_GRID_SIZE)
     server.set_robot_count(MAX_ROBOT_COUNT + 50)  # clamps to the max
     assert len(server.sim.world.robots) == MAX_ROBOT_COUNT
 
@@ -135,13 +139,13 @@ def test_set_grid_size_reinitializes():
 
 def test_set_robot_count_past_grid_capacity_does_not_hang():
     # Regression: this exact sequence (drag robots to the max, then the grid to its
-    # min — 150 robots > 10x10 = 100 cells) hung the live server's event loop, because
-    # add_robot() looped forever looking for a free cell that no longer existed. A
-    # test that completes at all is the proof this no longer hangs.
+    # min — MAX_ROBOT_COUNT robots > 10x10 = 100 cells) hung the live server's event
+    # loop, because add_robot() looped forever looking for a free cell that no longer
+    # existed. A test that completes at all is the proof this no longer hangs.
     server = SimulationServer()
     server.set_mode("warden")
     server.set_grid_size(10)
-    server.set_robot_count(MAX_ROBOT_COUNT)  # 150 requested, only 100 cells exist
+    server.set_robot_count(MAX_ROBOT_COUNT)  # far more requested than the 100 cells that exist
 
     assert len(server.sim.world.robots) == 100
     state = server.step_and_serialize()  # must not raise or hang

@@ -577,7 +577,7 @@ input[type="range"]:focus-visible {
 .sparkline-avg {
   display: flex;
   gap: 14px;
-  font-size: 0.75rem;
+  font-size: 1rem;
   color: var(--muted-foreground);
 }
 

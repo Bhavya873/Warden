@@ -61,6 +61,15 @@ python -m server.ws_server
 
 Open `web/index.html` in a browser. The dashboard compares Warden with the baseline using the same robot positions and movement seed.
 
+### Run it with Docker
+
+```bash
+docker build -t warden .
+docker run -p 8765:8765 warden
+```
+
+Then open `web/index.html` as above.
+
 ## Tests and benchmarks
 
 ```bash

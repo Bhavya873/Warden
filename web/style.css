@@ -580,9 +580,23 @@ input[type="range"]:focus-visible {
 
 .sparkline-avg {
   display: flex;
-  gap: 14px;
-  font-size: 1rem;
-  color: var(--muted-foreground);
+}
+
+.sparkline-avg-item {
+  width: 140px; /* matches .compare td's width, so these line up with its columns */
+  text-align: right;
+  padding: 0 8px;
+}
+
+/* Same font/size/format as .compare tbody td -- these are the same kind of number,
+   just averaged instead of a running total. */
+.sparkline-avg .mono {
+  font-size: 1.4rem;
+}
+
+.sparkline-avg .dot {
+  margin-right: 6px;
+  vertical-align: middle;
 }
 
 .sparkline-avg .dot {

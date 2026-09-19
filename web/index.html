@@ -138,9 +138,9 @@
           <tr>
             <th
               scope="row"
-              title="Number of requests waiting on the coordinator right now, not yet resolved. (Not a CPU percentage: this single-process demo shares one CPU between both boards, so a CPU-usage comparison wouldn't mean what it would for two separate services.)"
+              title="Requests currently in flight to the coordinator, not yet resolved — the honest proxy for network usage here. (Not a CPU percentage: this single-process demo shares one CPU between both boards, so a CPU-usage comparison wouldn't mean what it would for two separate services.)"
             >
-              Requests queued
+              Network requests queued
             </th>
             <td class="mono" id="cmp-naive-load" aria-label="Baseline">0</td>
             <td class="mono" id="cmp-warden-load" aria-label="Warden">0</td>
@@ -158,10 +158,10 @@
         </tbody>
       </table>
       <div class="sparkline-header">
-        <p class="sparkline-label">Requests queued over time</p>
-        <div class="sparkline-avg" title="Average queue depth over the visible window">
-          <span><span class="dot dot-naive"></span><span class="mono" id="load-avg-naive">avg 0</span></span>
-          <span><span class="dot dot-warden"></span><span class="mono" id="load-avg-warden">avg 0</span></span>
+        <p class="sparkline-label">Network requests queued over time</p>
+        <div class="sparkline-avg" title="Average network requests in flight over the visible window">
+          <span class="sparkline-avg-item"><span class="dot dot-naive"></span><span class="mono" id="load-avg-naive">0</span></span>
+          <span class="sparkline-avg-item"><span class="dot dot-warden"></span><span class="mono" id="load-avg-warden">0</span></span>
         </div>
       </div>
       <div class="sparkline-wrap">

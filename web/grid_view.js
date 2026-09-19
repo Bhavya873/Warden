@@ -185,8 +185,8 @@ function render(state) {
     const loadDataMax = Math.max(...loadChart.data.datasets[0].data, ...loadChart.data.datasets[1].data);
     loadChart.options.scales.y.max = loadSmoothedMax(loadDataMax);
     loadChart.update("none");
-    loadAvgNaiveEl.textContent = `avg ${average(loadChart.data.datasets[0].data).toFixed(1)}`;
-    loadAvgWardenEl.textContent = `avg ${average(loadChart.data.datasets[1].data).toFixed(1)}`;
+    loadAvgNaiveEl.textContent = `${average(loadChart.data.datasets[0].data).toFixed(1)}`;
+    loadAvgWardenEl.textContent = `${average(loadChart.data.datasets[1].data).toFixed(1)}`;
   }
 
   statTick.textContent = `(tick ${naive.tick})`;
@@ -341,8 +341,8 @@ resetBtn.addEventListener("click", () => {
   loadChart.data.datasets[1].data.length = 0;
   loadSmoothedMax = makeSmoothedMax(5);
   loadChart.update("none");
-  loadAvgNaiveEl.textContent = "avg 0";
-  loadAvgWardenEl.textContent = "avg 0";
+  loadAvgNaiveEl.textContent = "0";
+  loadAvgWardenEl.textContent = "0";
 });
 
 broadcastLagSelect.addEventListener("change", () => {

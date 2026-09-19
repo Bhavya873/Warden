@@ -59,7 +59,7 @@ pip install -r requirements.txt
 python -m server.ws_server
 ```
 
-Open `web/index.html` in a browser. The dashboard compares Warden with the baseline using the same robot positions and movement seed.
+Open `http://localhost:8765` in a browser — the server serves the dashboard itself. It compares Warden with the baseline using the same robot positions and movement seed.
 
 ### Run it with Docker
 

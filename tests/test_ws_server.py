@@ -1,10 +1,11 @@
 import asyncio
 import contextlib
 import json
+from http import HTTPStatus
 
 import websockets
 
-from server.ws_server import MAX_GRID_SIZE, MAX_ROBOT_COUNT, SimulationServer
+from server.ws_server import MAX_GRID_SIZE, MAX_ROBOT_COUNT, SimulationServer, serve_static
 
 
 def test_step_and_serialize_shape():
@@ -449,6 +450,54 @@ def test_near_miss_rate_rises_with_broadcast_lag():
         return total_near_misses / total_attempts
 
     assert near_miss_rate("normal") < near_miss_rate("adversarial")
+
+
+class _FakeRequest:
+    def __init__(self, path: str, upgrade: str = ""):
+        self.path = path
+        self.headers = {"Upgrade": upgrade} if upgrade else {}
+
+
+class _FakeConnection:
+    """Just enough of websockets' ServerConnection for serve_static's `connection.respond`
+    call -- returns something with .status_code like the real Response does."""
+
+    def respond(self, status: HTTPStatus, text: str):
+        return type("FakeResponse", (), {"status_code": status.value, "body": text})()
+
+
+def test_serve_static_returns_none_for_websocket_upgrade():
+    # process_request must return None for a real WS handshake, so websockets.serve
+    # proceeds with the upgrade instead of serve_static intercepting it.
+    async def body():
+        return await serve_static(_FakeConnection(), _FakeRequest("/", upgrade="websocket"))
+
+    assert asyncio.run(body()) is None
+
+
+def test_serve_static_serves_an_existing_file():
+    async def body():
+        return await serve_static(_FakeConnection(), _FakeRequest("/index.html"))
+
+    response = asyncio.run(body())
+    assert response.status_code == HTTPStatus.OK.value
+    assert b"<html" in response.body.lower() or b"<!doctype" in response.body.lower()
+
+
+def test_serve_static_404s_on_missing_file():
+    async def body():
+        return await serve_static(_FakeConnection(), _FakeRequest("/nope-does-not-exist.txt"))
+
+    response = asyncio.run(body())
+    assert response.status_code == HTTPStatus.NOT_FOUND.value
+
+
+def test_serve_static_blocks_path_traversal():
+    async def body():
+        return await serve_static(_FakeConnection(), _FakeRequest("/../server/ws_server.py"))
+
+    response = asyncio.run(body())
+    assert response.status_code == HTTPStatus.NOT_FOUND.value
 
 
 def test_server_end_to_end_over_real_websocket():

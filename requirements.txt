@@ -1,4 +1,4 @@
 maturin>=1.5,<2.0
 pytest
 matplotlib
-websockets
+websockets>=13,<18

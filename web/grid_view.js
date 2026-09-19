@@ -7,6 +7,7 @@
 
 const WS_URL = "ws://localhost:8765";
 const LOAD_CHART_WINDOW = 150; // ticks of history kept for the rolling line chart
+const TICK_BUDGET_MS = 100; // matches server/ws_server.py's TICK_INTERVAL_SECONDS
 
 // Mirrors the custom properties in style.css — kept in sync by hand, small enough not
 // to warrant a shared token pipeline between CSS and canvas/Chart.js drawing code.
@@ -112,9 +113,9 @@ const loadChart = new Chart(document.getElementById("load-chart"), {
       y: {
         display: true,
         beginAtZero: true,
-        max: 9, // ms -- capped so one rare slow tick can't blow out the whole axis
+        max: 2, // ms -- capped so one rare slow tick can't blow out the whole axis
         grid: { display: false },
-        ticks: { stepSize: 3, font: { size: 13 }, callback: (v) => `${v}ms` }, // 3ms, 6ms, 9ms
+        ticks: { stepSize: 1, font: { size: 13 }, callback: (v) => `${v}ms` }, // 0ms, 1ms, 2ms
       },
     },
   },
@@ -144,6 +145,15 @@ function average(values) {
 // keeps them genuinely independent on the chart, the way the simulations actually are.
 function stepMs(board) {
   return board.stats.server_seconds * 1000;
+}
+
+// The table row shows this as a % of the server's fixed 100ms tick budget -- a real,
+// independent-per-board percentage (each measured against the same fixed denominator),
+// unlike the earlier "share of the two combined" version, which was mathematically
+// forced to always sum to 100% between the two boards. The graph itself keeps plotting
+// raw ms, since that's what has an actual fixed y-axis scale (0/1/2ms) to read against.
+function tickBudgetPct(ms) {
+  return (ms / TICK_BUDGET_MS) * 100;
 }
 
 // --- WebSocket -----------------------------------------------------------
@@ -188,8 +198,8 @@ function render(state) {
     pushRolling(loadChart.data.datasets[1].data, stepMs(warden));
     pushRolling(loadChart.data.labels, naive.tick); // both boards are stepped together, one shared timeline
     loadChart.update("none");
-    loadAvgNaiveEl.textContent = `${average(loadChart.data.datasets[0].data).toFixed(2)}ms`;
-    loadAvgWardenEl.textContent = `${average(loadChart.data.datasets[1].data).toFixed(2)}ms`;
+    loadAvgNaiveEl.textContent = `${tickBudgetPct(average(loadChart.data.datasets[0].data)).toFixed(2)}%`;
+    loadAvgWardenEl.textContent = `${tickBudgetPct(average(loadChart.data.datasets[1].data)).toFixed(2)}%`;
 
     pushRolling(queueHistory.naive, naive.stats.queue_depth);
     pushRolling(queueHistory.warden, warden.stats.queue_depth);
@@ -346,8 +356,8 @@ resetBtn.addEventListener("click", () => {
   loadChart.data.datasets[0].data.length = 0;
   loadChart.data.datasets[1].data.length = 0;
   loadChart.update("none");
-  loadAvgNaiveEl.textContent = "0.00ms";
-  loadAvgWardenEl.textContent = "0.00ms";
+  loadAvgNaiveEl.textContent = "0.00%";
+  loadAvgWardenEl.textContent = "0.00%";
   queueHistory.naive.length = 0;
   queueHistory.warden.length = 0;
 });

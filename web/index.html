@@ -156,12 +156,12 @@
           <tr>
             <th
               scope="row"
-              title="Average wall-clock time each board's coordinator spent on genuine server-side work (not local robot-side filter checks), over the visible window — this is what the graph below plots. Each board's own number, not a share of the two combined, so Baseline and Warden can move independently (they run as separate simulations and never affect each other)."
+              title="Average share of the server's 100ms tick budget each board's coordinator spent on genuine server-side work (not local robot-side filter checks), over the visible window. Each board's own percentage against that same fixed budget, not a share of the two combined, so Baseline and Warden can move independently (they run as separate simulations and never affect each other). The graph below plots the same measurement in raw milliseconds."
             >
               Average server CPU usage
             </th>
-            <td class="mono" id="load-avg-naive" aria-label="Baseline">0.00ms</td>
-            <td class="mono" id="load-avg-warden" aria-label="Warden">0.00ms</td>
+            <td class="mono" id="load-avg-naive" aria-label="Baseline">0.00%</td>
+            <td class="mono" id="load-avg-warden" aria-label="Warden">0.00%</td>
           </tr>
         </tbody>
       </table>

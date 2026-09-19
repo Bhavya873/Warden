@@ -62,6 +62,28 @@ def test_per_robot_tracking_for_task_12_markers():
     assert saw_claimed, "expected at least one tick with a claimed (conflict) resolution"
 
 
+def test_warden_server_seconds_is_lower_than_naive_at_low_density():
+    # The whole point of server_seconds: it must reflect genuine server-side cost only
+    # (Coordinator.tick()/can_move()), excluding Warden's local Ribbon-filter checks
+    # and periodic rebuild, which are robot-side work in the real architecture (each
+    # robot holds its own filter and checks it locally before ever contacting the
+    # server). At low density, Warden resolves most moves instantly via the filter and
+    # only delegates a small fraction to the coordinator, so its cumulative
+    # server_seconds should be well below naive mode's, where every move is delegated.
+    # If server_seconds instead timed the whole per-tick step -- including the filter
+    # -- Warden would look *more* expensive here, which is the bug this guards against.
+    ticks = 500
+    naive = Simulator(grid_size=30, robot_count=10, seed=7, naive_mode=True)
+    naive.run(ticks)
+    naive_total = sum(entry["server_seconds"] for entry in naive.coordinator.log)
+
+    warden = Simulator(grid_size=30, robot_count=10, seed=7, warden_mode=True)
+    warden.run(ticks)
+    warden_total = sum(entry["server_seconds"] for entry in warden.coordinator.log)
+
+    assert warden_total < naive_total
+
+
 def test_queue_depth_rises_under_density():
     ticks = 500
     grid_size = 30

@@ -129,16 +129,21 @@ function average(values) {
   return values.length > 0 ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
 }
 
-// Server CPU usage, in ms: stats.step_seconds is the real wall-clock time
-// (time.perf_counter(), measured server-side around each board's own sim.step() call)
-// that tick's step took. Each board's own number, not a share of the two combined --
-// a "share" (own / (own + other's)) always sums to 100%, which makes the two lines
-// perfect mirror images of each other regardless of what's actually happening (an
-// artifact of the display math, not a real interaction -- Baseline and Warden run as
-// fully independent simulations and never affect each other). Plotting each board's
-// raw time keeps them genuinely independent on the chart, the way they actually are.
+// Server CPU usage, in ms: stats.server_seconds is real wall-clock time
+// (time.perf_counter(), measured inside core/coordinator.py itself) spent on genuine
+// server-side work only -- the coordinator's own tick()/can_move() logic. Deliberately
+// excludes Warden's local Ribbon-filter checks and periodic rebuild, which are
+// robot-side work in the real architecture (each robot holds its own filter and checks
+// it locally before ever contacting the server) -- an earlier version of this timed
+// the whole per-tick step instead, which wrongly made Warden look more expensive by
+// charging it for robot-side compute the server never actually does.
+//
+// Each board's own number, not a share of the two combined -- a "share" (own / (own +
+// other's)) always sums to 100%, forcing the two lines into perfect mirror images of
+// each other regardless of what's actually happening. Plotting each board's raw time
+// keeps them genuinely independent on the chart, the way the simulations actually are.
 function stepMs(board) {
-  return board.stats.step_seconds * 1000;
+  return board.stats.server_seconds * 1000;
 }
 
 // --- WebSocket -----------------------------------------------------------

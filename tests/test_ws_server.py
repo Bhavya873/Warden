@@ -25,7 +25,7 @@ def test_step_and_serialize_shape():
         assert robot["outcome"] in ("moved", "waiting", "conflict", "idle")
     assert set(state["stats"]) == {
         "queue_depth",
-        "step_seconds",
+        "server_seconds",
         "instant_moves",
         "confirmed_checks",
         "conflicts_avoided",
@@ -174,7 +174,7 @@ def test_split_mode_shape():
         assert len(board["robots"]) == board["robot_count"]
         assert set(state["boards"][label]["stats"]) == {
             "queue_depth",
-            "step_seconds",
+            "server_seconds",
             "instant_moves",
             "confirmed_checks",
             "conflicts_avoided",
@@ -284,19 +284,19 @@ def test_reset_restarts_from_tick_zero_with_a_different_layout():
     }
 
 
-def test_step_seconds_is_measured_and_resets_to_zero():
-    # Regression for the "server CPU usage" dashboard stat: step_seconds must be a real
-    # measurement (nonzero after an actual sim.step()), not a placeholder, and must go
-    # back to 0.0 right after reset() since nothing has been stepped yet at that point.
+def test_server_seconds_is_measured_and_resets_to_zero():
+    # Regression for the "server CPU usage" dashboard stat: server_seconds must be a
+    # real measurement (nonzero after an actual tick), not a placeholder, and must go
+    # back to 0.0 right after reset() since nothing has been ticked yet at that point.
     server = SimulationServer()
     state = server.step_and_serialize()
     for board in state["boards"].values():
-        assert board["stats"]["step_seconds"] > 0
+        assert board["stats"]["server_seconds"] > 0
 
     server.reset()
     assert server._last_state is not None
     for board in server._last_state["boards"].values():
-        assert board["stats"]["step_seconds"] == 0.0
+        assert board["stats"]["server_seconds"] == 0.0
 
 
 def test_reset_preserves_robot_count_and_grid_size():

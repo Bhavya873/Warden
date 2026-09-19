@@ -9,6 +9,7 @@ claimed as of the last ring-buffer sync.
 """
 
 import random
+import time
 
 import warden_core
 
@@ -46,6 +47,13 @@ class Coordinator:
 
         self._checks_this_tick = 0
         self._conflicts_avoided_this_tick = 0
+        # Wall-clock time spent inside can_move() since the log entry was last appended
+        # — real, measured server-side cost (this class IS the server), timed directly
+        # rather than inferred. Logged with a one-tick lag, same as _checks_this_tick:
+        # can_move() runs during GridWorld's move loop, which happens *after* tick() in
+        # Simulator.step(), so a given log entry's server_seconds covers the previous
+        # tick's can_move() calls plus this tick()'s own bookkeeping.
+        self._server_seconds_this_tick = 0.0
         self.log: list[dict] = []
         # robot_ids whose confirm-check resolved to "claimed" on the tick just
         # completed — Task 12's per-robot red marker reads this (a count alone can't
@@ -65,6 +73,13 @@ class Coordinator:
         return self._ring_buffer.claimed_cells()
 
     def can_move(self, robot, next_cell: Cell) -> bool:
+        start = time.perf_counter()
+        try:
+            return self._can_move(robot, next_cell)
+        finally:
+            self._server_seconds_this_tick += time.perf_counter() - start
+
+    def _can_move(self, robot, next_cell: Cell) -> bool:
         outstanding = self._outstanding_by_robot.get(robot.robot_id)
 
         if outstanding is None or outstanding[1] != next_cell:
@@ -101,6 +116,7 @@ class Coordinator:
         logs the tick's confirm-check volume, queue depth, and average response delay —
         the three numbers Phase 4's benchmark harness reads (build spec §6 Phase 2
         step 5)."""
+        start = time.perf_counter()
         self._current_tick = current_tick
         self._ring_buffer.tick(current_tick)
         self._sync_occupancy(occupied_cells)
@@ -111,6 +127,7 @@ class Coordinator:
                 self._responses[request_id] = self._ring_buffer.is_claimed(cell)
                 resolved_delays.append(arrival_tick - requested_tick)
                 del self._pending[request_id]
+        tick_seconds = time.perf_counter() - start
 
         self.log.append(
             {
@@ -119,11 +136,13 @@ class Coordinator:
                 "conflicts_avoided": self._conflicts_avoided_this_tick,
                 "queue_depth": len(self._pending),
                 "avg_delay": (sum(resolved_delays) / len(resolved_delays)) if resolved_delays else None,
+                "server_seconds": self._server_seconds_this_tick + tick_seconds,
             }
         )
         self._checks_this_tick = 0
         self._conflicts_avoided_this_tick = 0
         self.claimed_robot_ids_this_tick = []
+        self._server_seconds_this_tick = 0.0
 
 
 DEFAULT_FILTER_REFRESH_INTERVAL_TICKS = 5
@@ -186,6 +205,10 @@ class WardenCoordinator:
         return self._coordinator.claimed_robot_ids_this_tick
 
     def can_move(self, robot, next_cell: Cell) -> bool:
+        # The filter check below is real work, but it's *robot*-side work in the real
+        # architecture (each robot holds its own local filter) — it's deliberately not
+        # timed as server cost. Only the delegated call actually touches the server,
+        # and self._coordinator times that itself (see Coordinator.can_move above).
         if not self._filter.contains(next_cell):
             self.instant_moves_this_tick += 1
             return True  # definitely free — no coordinator call
@@ -196,6 +219,9 @@ class WardenCoordinator:
 
         due_for_refresh = self._filter is None or current_tick % self.filter_refresh_interval_ticks == 0
         if due_for_refresh:
+            # Also robot-side in the real architecture (each robot rebuilds its own
+            # filter from the broadcast claimed-cells list) — not counted as server
+            # time, same reasoning as the .contains() check above.
             self._filter = warden_core.RibbonFilter(self._coordinator.claimed_cells(), self.filter_target_fpr)
 
         self.log.append(
@@ -205,6 +231,10 @@ class WardenCoordinator:
                 "confirmed_checks": self._coordinator.log[-1]["confirm_checks"],
                 "conflicts_avoided": self._coordinator.log[-1]["conflicts_avoided"],
                 "filter_refreshed": due_for_refresh,
+                # The wrapped Coordinator only ever does work when this class delegates
+                # to it (the "maybe claimed" path), so its own measured server_seconds
+                # already is Warden's genuine server-side cost — nothing to add here.
+                "server_seconds": self._coordinator.log[-1]["server_seconds"],
             }
         )
         self.instant_moves_this_tick = 0

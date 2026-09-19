@@ -81,8 +81,11 @@ construction — not a coincidence of this demo's random seeds.
 
 import asyncio
 import json
+import mimetypes
 import os
 import random
+from http import HTTPStatus
+from pathlib import Path
 
 import websockets
 
@@ -92,6 +95,24 @@ from sim.simulator import Simulator
 HOST = os.environ.get("WARDEN_HOST", "localhost")
 PORT = int(os.environ.get("PORT", 8765))
 TICK_INTERVAL_SECONDS = 0.1
+
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+
+
+async def serve_static(path, request_headers):
+    """Answers plain HTTP GETs (the browser loading the page/assets) with files from
+    web/, so the same Railway service serves both the dashboard and its WS stream.
+    Returns None for genuine WebSocket upgrade requests, which lets websockets.serve
+    proceed with the handshake as usual."""
+    if request_headers.get("Upgrade", "").lower() == "websocket":
+        return None
+    file_path = path.split("?", 1)[0].lstrip("/") or "index.html"
+    target = (WEB_DIR / file_path).resolve()
+    if WEB_DIR not in target.parents or not target.is_file():
+        return HTTPStatus.NOT_FOUND, [], b"Not found"
+    content_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+    body = target.read_bytes()
+    return HTTPStatus.OK, [("Content-Type", content_type)], body
 
 MIN_ROBOT_COUNT = 1
 MAX_ROBOT_COUNT = 1000
@@ -441,9 +462,8 @@ class SimulationServer:
 
 async def run_server(host: str = HOST, port: int = PORT) -> None:
     server_state = SimulationServer()
-    async with websockets.serve(server_state.handle_client, host, port):
-        print(f"Warden WS server listening on ws://{host}:{port}")
-        print("Open web/index.html directly in a browser to view the demo.")
+    async with websockets.serve(server_state.handle_client, host, port, process_request=serve_static):
+        print(f"Warden server listening on http://{host}:{port} (dashboard + WS on the same port)")
         await server_state.broadcast_loop()
 
 

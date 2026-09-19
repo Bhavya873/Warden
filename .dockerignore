@@ -2,7 +2,6 @@
 .git
 tests
 results
-web
 core-rs/target
 __pycache__
 *.pyc

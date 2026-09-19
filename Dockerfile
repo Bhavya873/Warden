@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir /wheels/*.whl
 COPY core ./core
 COPY sim ./sim
 COPY server ./server
+COPY web ./web
 
 ENV WARDEN_HOST=0.0.0.0
 EXPOSE 8765

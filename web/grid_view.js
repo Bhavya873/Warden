@@ -105,7 +105,12 @@ const loadChart = new Chart(document.getElementById("load-chart"), {
         grid: { display: false },
         ticks: { maxTicksLimit: 5, font: { size: 10 } },
       },
-      y: { display: false, beginAtZero: true },
+      y: {
+        display: true,
+        beginAtZero: true,
+        grid: { display: false },
+        ticks: { maxTicksLimit: 4, font: { size: 10 } },
+      },
     },
   },
 });

@@ -112,9 +112,9 @@ const loadChart = new Chart(document.getElementById("load-chart"), {
       y: {
         display: true,
         beginAtZero: true,
-        max: 7, // ms -- capped so one rare slow tick can't blow out the whole axis
+        max: 9, // ms -- capped so one rare slow tick can't blow out the whole axis
         grid: { display: false },
-        ticks: { maxTicksLimit: 4, font: { size: 13 }, callback: (v) => `${v}ms` },
+        ticks: { stepSize: 3, font: { size: 13 }, callback: (v) => `${v}ms` }, // 3ms, 6ms, 9ms
       },
     },
   },

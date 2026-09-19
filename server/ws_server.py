@@ -25,7 +25,7 @@ valid server capability for any other client:
                 "near_misses": int}}
      (instant_moves is always 0 in naive mode — every move is a confirmed check there,
      and near_miss/near_misses are always 0/false there too, since staleness is a
-     Warden-filter concept — see tasks/staleness-finding.md. "totals" are cumulative
+     Warden-filter concept — see README.md's "The staleness finding" section. "totals" are cumulative
      since the current mode was selected — a mode switch resets them, since it's a
      fresh coordinator; a robot-count change does not. `outcome` is the color-coding
      from the original design doc's demo spec — green="moved" (this tick, either
@@ -70,13 +70,13 @@ reset rebuilds the current board(s) from tick 0 with fresh spawn positions, keep
 current grid size / robot count / broadcast-lag preference, but with a newly rolled seed
 — repeated resets show a different layout each time rather than replaying the same one.
 
-set_broadcast_lag controls the Warden filter's refresh interval (build spec §6 Phase 5
-step 7, the amendment) — it's a standing preference, applied to whichever Warden
-coordinator(s) are currently active and to any created afterward (mode switch, split
-entry, grid resize), not just a one-shot action. It has no effect on naive mode (no
-filter to go stale). "adversarial" (1,000,000 ticks — effectively never refreshes) is
-the exact setting tasks/staleness-finding.md tested: ~33% near-miss rate, zero
-collisions, ever, by construction — not a coincidence of this demo's random seeds.
+set_broadcast_lag controls the Warden filter's refresh interval — it's a standing
+preference, applied to whichever Warden coordinator(s) are currently active and to
+any created afterward (mode switch, split entry, grid resize), not just a one-shot
+action. It has no effect on naive mode (no filter to go stale). "adversarial"
+(1,000,000 ticks — effectively never refreshes) is the exact setting README.md's
+staleness finding tested: ~33% near-miss rate, zero collisions, ever, by
+construction — not a coincidence of this demo's random seeds.
 """
 
 import asyncio
@@ -106,9 +106,9 @@ DEFAULT_SEED = 1
 RING_BUFFER_CAPACITY = MAX_ROBOT_COUNT * CAPACITY_MULTIPLIER
 
 # Filter refresh interval (ticks) per broadcast-lag preset. "normal" matches
-# WardenCoordinator's own default. "adversarial" is the exact value
-# tasks/staleness-finding.md's adversarial test used — see that doc for the measured
-# near-miss rate this reproduces.
+# WardenCoordinator's own default. "adversarial" is the exact value README.md's
+# staleness finding used — see that section for the measured near-miss rate this
+# reproduces.
 BROADCAST_LAG_PRESETS = {"normal": 5, "degraded": 30, "adversarial": 1_000_000}
 DEFAULT_BROADCAST_LAG = "normal"
 

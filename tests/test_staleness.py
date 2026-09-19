@@ -1,9 +1,10 @@
-"""Adversarial staleness test — build spec §6 Phase 3 step 6 (the amendment). Sets the
-Warden filter's refresh interval far past any realistic cell-occupation time (it never
-refreshes after the initial build) and confirms two things: the risky path is genuinely
-exercised (near-misses actually happen, a lot), and it never produces a real collision.
+"""Adversarial staleness test. Sets the Warden filter's refresh interval far past any
+realistic cell-occupation time (it never refreshes after the initial build) and
+confirms two things: the risky path is genuinely exercised (near-misses actually
+happen, a lot), and it never produces a real collision.
 
-See tasks/staleness-finding.md for the full written finding this test backs.
+See README.md's "The staleness finding" section for the full written finding this
+test backs.
 """
 
 from core.coordinator import WardenCoordinator

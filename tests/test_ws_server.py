@@ -399,8 +399,8 @@ def test_broadcast_lag_applies_to_warden_board_in_split_mode():
 
 
 def test_near_miss_rate_rises_with_broadcast_lag():
-    # Cross-checks the live server against tasks/staleness-finding.md's offline finding:
-    # near-miss frequency should rise as broadcast lag worsens, not stay flat or drop.
+    # Cross-checks the live server against README.md's staleness finding: near-miss
+    # frequency should rise as broadcast lag worsens, not stay flat or drop.
     def near_miss_rate(level: str) -> float:
         server = SimulationServer()
         server.set_mode("warden")

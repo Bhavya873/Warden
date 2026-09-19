@@ -67,14 +67,12 @@ class GridWorld:
         self.robots: list[Robot] = []
         # A near-miss: `policy` approved a move (instant or confirmed) but the live
         # occupancy check below rejected it anyway, because ground truth had already
-        # moved on by the time the move was attempted. Defined and measured in build
-        # spec §6 Phase 3 step 6's adversarial staleness test — see tests/test_staleness.py
-        # and tasks/staleness-finding.md.
+        # moved on by the time the move was attempted. See tests/test_staleness.py and
+        # README.md's "The staleness finding" section.
         self.near_miss_count = 0
-        # robot_ids that had a near-miss on the tick just completed — for Task 11's
-        # broadcast-lag control to mark them distinctly (not red — see
-        # tasks/staleness-finding.md's near-miss definition) instead of only reporting
-        # a cumulative count.
+        # robot_ids that had a near-miss on the tick just completed — the broadcast-lag
+        # control marks them distinctly (not red) instead of only reporting a
+        # cumulative count.
         self.near_miss_robot_ids: list[int] = []
         self._spawn_robots()
         self._next_robot_id = self.robot_count

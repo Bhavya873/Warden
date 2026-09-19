@@ -1,7 +1,8 @@
 """Fast, small-scale tests for the benchmark harness's own logic (metrics shape,
 aggregation math, the traffic-reduction formula, output writing) — not a
 reproduction of the full production benchmark run, which is slow and produces the
-real headline figures via `python -m sim.scenarios` (see tasks/benchmark-findings.md).
+real headline figures via `python -m sim.scenarios` (see README.md's "Measured
+results" section).
 """
 
 import csv

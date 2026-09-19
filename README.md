@@ -86,9 +86,9 @@ each, on a fixed 30×30 grid — over 1.6M simulated moves. Writes
 
 ## Measured results
 
-See `docs/benchmark-findings.md` for the full writeup. Headline numbers, measured
-(not estimated) — traffic reduction narrows under heavy contention, it is not flat
-across density:
+Headline numbers, measured (not estimated) via `python -m sim.scenarios` — 5 seeds
+× 3 density presets × naive/Warden, 1,500 ticks each, over 1.6M simulated moves.
+Traffic reduction narrows under heavy contention, it is not flat across density:
 
 | Density | Robots | Warden instant % | Reduction vs. naive |
 | --- | --- | --- | --- |
@@ -103,14 +103,18 @@ margin as contention rises (see `results/coordinator_load.png`).
 
 Because a robot's local filter only refreshes periodically, it can say "definitely
 free" for a cell another robot claimed moments ago, whose broadcast hasn't
-propagated yet — that path skips the confirm-check entirely. `docs/staleness-finding.md`
-documents a dedicated adversarial test (filter frozen for 5,000 ticks) and the
-result: near-misses are common under adversarial settings (~33% of moves), but
+propagated yet — that path skips the confirm-check entirely. A dedicated adversarial
+test (`tests/test_staleness.py`, filter frozen for 5,000 ticks) exercises this
+deliberately: near-misses are common under adversarial settings (~33% of moves), but
 **zero collisions**, because the grid's live occupancy check is the final authority
 on every move regardless of what any policy approved — filter/ring-buffer staleness
-can produce a wrong "go ahead," never a wrong outcome. The doc also states the
-honest limitation: this guarantee is a property of this single-process simulation's
-synchronous ground truth, not a claim about a real distributed deployment.
+can produce a wrong "go ahead," never a wrong outcome.
+
+Honest limitation: that guarantee is a property of this single-process simulation's
+synchronous ground truth (checking and updating occupancy is one in-process
+operation with no propagation delay) — not a claim about what a real distributed
+deployment's guarantee would be, where "ground truth" would itself be spread across
+robots and a coordinator, each with its own network delay.
 
 ## Scope — what's not here
 

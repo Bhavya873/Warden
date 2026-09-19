@@ -320,69 +320,65 @@ function drawFloor(ctx, canvas, gridSize, robots) {
 
   const radius = cellSize * 0.32;
 
-  // Batched by style: one path with every robot's arc/line in it, then one fill() or
-  // stroke() call for the whole batch, instead of up to 4 separate canvas calls PER
-  // ROBOT (which is what this used to do — a real bottleneck at hundreds of robots,
-  // since canvas draw-call overhead dominates over the trivial per-robot math).
+  // Batched by style via Path2D, built in a single walk over `robots` -- the previous
+  // version walked the array 7 times (halo, 4 outcome buckets, direction, near-miss),
+  // recomputing each robot's cx/cy fresh every time. At max robot count / grid size that
+  // was 7x the array-scan and coordinate-math cost for no drawing benefit -- Path2D lets
+  // several paths accumulate concurrently, so one pass fills all of them, then a fixed
+  // handful of fill()/stroke() calls draws the batches.
+  const haloPath = new Path2D();
+  const outcomePaths = { moved: new Path2D(), waiting: new Path2D(), conflict: new Path2D(), idle: new Path2D() };
+  const directionPath = new Path2D();
+  const nearMissPath = new Path2D();
+  let anyMoving = false;
+  let anyNearMiss = false;
 
-  // Halo: same color for every robot, so it's just one pass regardless of outcome.
-  ctx.fillStyle = COLORS.panel;
-  ctx.beginPath();
   for (const robot of robots) {
     const cx = robot.x * cellSize + cellSize / 2;
     const cy = robot.y * cellSize + cellSize / 2;
-    ctx.moveTo(cx + radius + 1.5, cy);
-    ctx.arc(cx, cy, radius + 1.5, 0, Math.PI * 2);
-  }
-  ctx.fill();
 
-  // Main dot: one pass per outcome color (at most 4 fill() calls total, not one per robot).
+    haloPath.moveTo(cx + radius + 1.5, cy);
+    haloPath.arc(cx, cy, radius + 1.5, 0, Math.PI * 2);
+
+    const outcomePath = outcomePaths[robot.outcome] ?? outcomePaths.idle;
+    outcomePath.moveTo(cx + radius, cy);
+    outcomePath.arc(cx, cy, radius, 0, Math.PI * 2);
+
+    if (robot.dx !== 0 || robot.dy !== 0) {
+      anyMoving = true;
+      directionPath.moveTo(cx, cy);
+      directionPath.lineTo(cx + robot.dx * radius * 1.5, cy + robot.dy * radius * 1.5);
+    }
+
+    // Near-miss ring: the filter/coordinator approved this move but ground truth caught
+    // it — a distinct ring, not red, so it isn't mistaken for a caught conflict.
+    if (robot.near_miss) {
+      anyNearMiss = true;
+      nearMissPath.moveTo(cx + radius * 1.7, cy);
+      nearMissPath.arc(cx, cy, radius * 1.7, 0, Math.PI * 2);
+    }
+  }
+
+  ctx.fillStyle = COLORS.panel;
+  ctx.fill(haloPath);
+
   for (const outcome in OUTCOME_COLORS) {
     ctx.fillStyle = OUTCOME_COLORS[outcome];
-    ctx.beginPath();
-    let any = false;
-    for (const robot of robots) {
-      if ((robot.outcome in OUTCOME_COLORS ? robot.outcome : "idle") !== outcome) continue;
-      any = true;
-      const cx = robot.x * cellSize + cellSize / 2;
-      const cy = robot.y * cellSize + cellSize / 2;
-      ctx.moveTo(cx + radius, cy);
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    }
-    if (any) ctx.fill();
+    ctx.fill(outcomePaths[outcome]);
   }
 
-  // Direction line: one pass for every moving robot.
-  ctx.strokeStyle = COLORS.ink;
-  ctx.lineWidth = 1.5;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  let anyMoving = false;
-  for (const robot of robots) {
-    if (robot.dx === 0 && robot.dy === 0) continue;
-    anyMoving = true;
-    const cx = robot.x * cellSize + cellSize / 2;
-    const cy = robot.y * cellSize + cellSize / 2;
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + robot.dx * radius * 1.5, cy + robot.dy * radius * 1.5);
+  if (anyMoving) {
+    ctx.strokeStyle = COLORS.ink;
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = "round";
+    ctx.stroke(directionPath);
   }
-  if (anyMoving) ctx.stroke();
 
-  // Near-miss ring: the filter/coordinator approved this move but ground truth caught
-  // it — a distinct ring, not red, so it isn't mistaken for a caught conflict.
-  ctx.strokeStyle = COLORS.nearMiss;
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  let anyNearMiss = false;
-  for (const robot of robots) {
-    if (!robot.near_miss) continue;
-    anyNearMiss = true;
-    const cx = robot.x * cellSize + cellSize / 2;
-    const cy = robot.y * cellSize + cellSize / 2;
-    ctx.moveTo(cx + radius * 1.7, cy);
-    ctx.arc(cx, cy, radius * 1.7, 0, Math.PI * 2);
+  if (anyNearMiss) {
+    ctx.strokeStyle = COLORS.nearMiss;
+    ctx.lineWidth = 2.5;
+    ctx.stroke(nearMissPath);
   }
-  if (anyNearMiss) ctx.stroke();
 }
 
 // --- Controls --------------------------------------------------------------

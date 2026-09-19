@@ -112,9 +112,8 @@ const loadChart = new Chart(document.getElementById("load-chart"), {
       y: {
         display: true,
         beginAtZero: true,
-        max: 100, // a percentage of robot_count now, not a raw count -- fixed, not smoothed
         grid: { display: false },
-        ticks: { maxTicksLimit: 4, font: { size: 13 }, callback: (v) => `${v}%` },
+        ticks: { maxTicksLimit: 4, font: { size: 13 }, callback: (v) => `${v}ms` },
       },
     },
   },
@@ -129,18 +128,35 @@ function average(values) {
   return values.length > 0 ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
 }
 
-// Server CPU usage, as a live share between the two boards: stats.step_seconds is the
-// real wall-clock time (time.perf_counter(), measured server-side around each board's
-// own sim.step() call) that tick's step took. Sharing it this way -- own / (own +
-// other's) -- is honest about what it actually is: a direct comparison of the two
-// coordinators' real compute cost, not a host-level CPU-utilization percentage (which
-// this single-process demo can't measure meaningfully -- see tasks/benchmark-
-// findings.md). It's bounded [0, 100] by construction, which is why the chart's y-axis
-// can just be a flat 0-100 instead of an unbounded dynamic max.
-function cpuSharePct(board, other) {
-  const total = board.stats.step_seconds + other.stats.step_seconds;
-  return total > 0 ? (board.stats.step_seconds / total) * 100 : 0;
+// Server CPU usage, in ms: stats.step_seconds is the real wall-clock time
+// (time.perf_counter(), measured server-side around each board's own sim.step() call)
+// that tick's step took. Each board's own number, not a share of the two combined --
+// a "share" (own / (own + other's)) always sums to 100%, which makes the two lines
+// perfect mirror images of each other regardless of what's actually happening (an
+// artifact of the display math, not a real interaction -- Baseline and Warden run as
+// fully independent simulations and never affect each other). Plotting each board's
+// raw time keeps them genuinely independent on the chart, the way they actually are.
+function stepMs(board) {
+  return board.stats.step_seconds * 1000;
 }
+
+// Chart.js's built-in auto-scaling recomputes the axis max every single tick, so a
+// value oscillating quickly makes the whole axis visibly snap back and forth. An
+// EMA-smoothed max grows fast (so real spikes are never clipped) but shrinks slowly
+// (so a brief dip doesn't yank the axis back down), which reads as a steady axis
+// instead of a jittery one. (Needed again now that this is an unbounded ms value, not
+// a percentage with a fixed 0-100 ceiling.)
+function makeSmoothedMax(seed) {
+  let current = seed;
+  return function smoothedMax(dataMax) {
+    const target = Math.max(dataMax * 1.15, seed);
+    const alpha = target > current ? 0.3 : 0.02;
+    current += (target - current) * alpha;
+    return current;
+  };
+}
+
+let loadSmoothedMax = makeSmoothedMax(1); // reassigned on reset — see resetBtn handler
 
 // --- WebSocket -----------------------------------------------------------
 
@@ -180,12 +196,14 @@ function render(state) {
   // controls stay responsive), which would otherwise push duplicate points onto the
   // rolling window and make the sparkline visibly scroll even though nothing changed.
   if (!state.paused) {
-    pushRolling(loadChart.data.datasets[0].data, cpuSharePct(naive, warden));
-    pushRolling(loadChart.data.datasets[1].data, cpuSharePct(warden, naive));
+    pushRolling(loadChart.data.datasets[0].data, stepMs(naive));
+    pushRolling(loadChart.data.datasets[1].data, stepMs(warden));
     pushRolling(loadChart.data.labels, naive.tick); // both boards are stepped together, one shared timeline
+    const loadDataMax = Math.max(...loadChart.data.datasets[0].data, ...loadChart.data.datasets[1].data);
+    loadChart.options.scales.y.max = loadSmoothedMax(loadDataMax);
     loadChart.update("none");
-    loadAvgNaiveEl.textContent = `${average(loadChart.data.datasets[0].data).toFixed(0)}%`;
-    loadAvgWardenEl.textContent = `${average(loadChart.data.datasets[1].data).toFixed(0)}%`;
+    loadAvgNaiveEl.textContent = `${average(loadChart.data.datasets[0].data).toFixed(2)}ms`;
+    loadAvgWardenEl.textContent = `${average(loadChart.data.datasets[1].data).toFixed(2)}ms`;
 
     pushRolling(queueHistory.naive, naive.stats.queue_depth);
     pushRolling(queueHistory.warden, warden.stats.queue_depth);
@@ -341,9 +359,10 @@ resetBtn.addEventListener("click", () => {
   loadChart.data.labels.length = 0;
   loadChart.data.datasets[0].data.length = 0;
   loadChart.data.datasets[1].data.length = 0;
+  loadSmoothedMax = makeSmoothedMax(1);
   loadChart.update("none");
-  loadAvgNaiveEl.textContent = "0%";
-  loadAvgWardenEl.textContent = "0%";
+  loadAvgNaiveEl.textContent = "0.00ms";
+  loadAvgWardenEl.textContent = "0.00ms";
   queueHistory.naive.length = 0;
   queueHistory.warden.length = 0;
 });

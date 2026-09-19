@@ -81,6 +81,7 @@ construction — not a coincidence of this demo's random seeds.
 
 import asyncio
 import json
+import os
 import random
 
 import websockets
@@ -88,7 +89,7 @@ import websockets
 from core.coordinator import CAPACITY_MULTIPLIER, Coordinator, WardenCoordinator
 from sim.simulator import Simulator
 
-HOST = "localhost"
+HOST = os.environ.get("WARDEN_HOST", "localhost")
 PORT = 8765
 TICK_INTERVAL_SECONDS = 0.1
 

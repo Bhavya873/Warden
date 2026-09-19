@@ -142,13 +142,6 @@ function cpuSharePct(board, other) {
   return total > 0 ? (board.stats.step_seconds / total) * 100 : 0;
 }
 
-// Network queue, as a % of robot_count: each robot has at most one pending
-// confirm-check at a time, so this is bounded [0, 100] -- a real percentage, not a raw
-// count with no natural ceiling.
-function queuePct(board) {
-  return board.robot_count > 0 ? (board.stats.queue_depth / board.robot_count) * 100 : 0;
-}
-
 // --- WebSocket -----------------------------------------------------------
 
 function connect() {
@@ -194,8 +187,8 @@ function render(state) {
     loadAvgNaiveEl.textContent = `${average(loadChart.data.datasets[0].data).toFixed(0)}%`;
     loadAvgWardenEl.textContent = `${average(loadChart.data.datasets[1].data).toFixed(0)}%`;
 
-    pushRolling(queueHistory.naive, queuePct(naive));
-    pushRolling(queueHistory.warden, queuePct(warden));
+    pushRolling(queueHistory.naive, naive.stats.queue_depth);
+    pushRolling(queueHistory.warden, warden.stats.queue_depth);
   }
 
   statTick.textContent = `(tick ${naive.tick})`;
@@ -214,7 +207,7 @@ function render(state) {
 
 function updateCompareRow(els, board, queueHist) {
   els.moves.textContent = board.totals.instant_moves + board.totals.confirmed_checks;
-  els.queue.textContent = `${average(queueHist).toFixed(0)}%`;
+  els.queue.textContent = average(queueHist).toFixed(1);
   els.conflicts.textContent = board.totals.conflicts_avoided;
 }
 

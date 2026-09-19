@@ -482,17 +482,25 @@ input[type="range"]:focus-visible {
   margin-top: 48px;
 }
 
+/* Two rows on the right column: the "fewer requests..." label on top, the
+   Baseline/Warden legend directly under it -- so the legend sits right above this
+   block's own dividing line instead of floating separately above everything. The
+   number spans both rows, vertically centered next to them. */
 .hero-stat {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding-bottom: 20px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 16px;
+  row-gap: 8px;
+  padding-bottom: 16px;
   margin-bottom: 20px;
   border-bottom: var(--brutal-border) solid var(--foreground);
   cursor: help;
 }
 
 .hero-stat-number {
+  grid-row: 1 / span 2;
+  align-self: center;
   font-size: 3.5rem; /* VT323 reads smaller than its font-size, same as .abstract */
   font-weight: 400; /* VT323 has no bold face */
   letter-spacing: -0.02em;
@@ -501,6 +509,8 @@ input[type="range"]:focus-visible {
 }
 
 .hero-stat-label {
+  grid-column: 2;
+  grid-row: 1;
   font-size: 0.9375rem;
   color: var(--foreground);
   line-height: 1.4;
@@ -515,10 +525,11 @@ input[type="range"]:focus-visible {
    further down shares — not tied to the table markup itself, since the hero-stat
    sits between them either way. */
 .compare-legend {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: end;
   display: flex;
   justify-content: flex-end;
-  margin-top: 12px;
-  margin-bottom: 16px;
   font-size: 0.75rem;
   color: var(--muted-foreground);
 }

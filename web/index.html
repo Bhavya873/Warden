@@ -142,9 +142,9 @@
           <tr>
             <th
               scope="row"
-              title="Requests currently waiting on the coordinator — this single-process demo shares one CPU between both boards, so queue depth (not a CPU percentage) is the honest stand-in for server load here"
+              title="Number of requests waiting on the coordinator right now, not yet resolved. (Not a CPU percentage: this single-process demo shares one CPU between both boards, so a CPU-usage comparison wouldn't mean what it would for two separate services.)"
             >
-              Server load
+              Requests queued
             </th>
             <td class="mono" id="cmp-naive-load">0</td>
             <td class="mono" id="cmp-warden-load">0</td>
@@ -162,8 +162,8 @@
         </tbody>
       </table>
       <div class="sparkline-header">
-        <p class="sparkline-label">Server load over time</p>
-        <div class="sparkline-avg" title="Average server load over the visible window">
+        <p class="sparkline-label">Requests queued over time</p>
+        <div class="sparkline-avg" title="Average queue depth over the visible window">
           <span><span class="dot dot-naive"></span><span class="mono" id="load-avg-naive">avg 0</span></span>
           <span><span class="dot dot-warden"></span><span class="mono" id="load-avg-warden">avg 0</span></span>
         </div>

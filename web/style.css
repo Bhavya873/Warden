@@ -558,11 +558,6 @@ input[type="range"]:focus-visible {
   width: 140px;
 }
 
-.compare tbody tr:last-child th,
-.compare tbody tr:last-child td {
-  border-bottom: none;
-}
-
 .sparkline-header {
   display: flex;
   justify-content: space-between;
@@ -571,8 +566,11 @@ input[type="range"]:focus-visible {
 }
 
 .sparkline-label {
+  /* Matches .compare tbody th (e.g. "Conflicts prevented") -- same font, size, and
+     color, so it reads as one more row label rather than a separately-styled caption. */
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 400;
   color: var(--muted-foreground);
 }
 

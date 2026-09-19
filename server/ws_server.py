@@ -208,28 +208,36 @@ class SimulationServer:
                 robot_count=robot_count, seed=self._seed, ring_buffer_capacity=RING_BUFFER_CAPACITY
             )
             self._apply_broadcast_lag(self.sim)
+        self._refresh_last_state()
 
     def set_paused(self, paused: bool) -> None:
         self.paused = bool(paused)
 
+    def _refresh_last_state(self) -> None:
+        """Rebuilds `_last_state` from current sim state right now, without stepping —
+        for any control message that changes visible state (grid size, robot count,
+        mode, reset) so a paused client sees the change immediately instead of it
+        silently applying server-side but staying invisible until Play is pressed
+        (broadcast_loop only regenerates `_last_state` on non-paused ticks)."""
+        if self.mode == "split":
+            befores = {label: sim.world.robot_positions() for label, sim in self.split_sims.items()}
+            self._last_state = self._snapshot_split(befores)
+        else:
+            self._last_state = self._snapshot_single(self.sim.world.robot_positions())
+
     def reset(self) -> None:
         """Rebuilds the current board(s) from tick 0 with a freshly rolled seed —
         same grid size / robot count / broadcast-lag preference, different layout each
-        time rather than replaying the same one. Refreshes `_last_state` immediately
-        (rather than waiting for the next non-paused broadcast_loop tick) so hitting
-        Reset while paused is visible right away instead of silently doing nothing
-        until Play is pressed."""
+        time rather than replaying the same one."""
         self._seed = random.randint(0, 2**31 - 1)
         if self.mode == "split":
             robot_count = len(self.split_sims["naive"].world.robots)
             self.split_sims = self._new_split_simulators(robot_count)
             self.split_totals = {"naive": _zero_totals(), "warden": _zero_totals()}
-            befores = {label: sim.world.robot_positions() for label, sim in self.split_sims.items()}
-            self._last_state = self._snapshot_split(befores)
         else:
             self.sim = self._new_single_simulator()
             self.totals = _zero_totals()
-            self._last_state = self._snapshot_single(self.sim.world.robot_positions())
+        self._refresh_last_state()
 
     def set_broadcast_lag(self, level: str) -> None:
         """Live-adjusts the Warden filter's refresh interval on whichever coordinator(s)
@@ -243,6 +251,7 @@ class SimulationServer:
             self._apply_broadcast_lag(self.split_sims["warden"])
         else:
             self._apply_broadcast_lag(self.sim)
+        self._refresh_last_state()
 
     def set_grid_size(self, size: int) -> None:
         """Re-initializes the sim(s) — grid size can't change under existing robots
@@ -259,6 +268,7 @@ class SimulationServer:
         else:
             self.sim = self._new_single_simulator()
             self.totals = _zero_totals()
+        self._refresh_last_state()
 
     def set_robot_count(self, count: int) -> None:
         count = max(MIN_ROBOT_COUNT, min(MAX_ROBOT_COUNT, count))
@@ -269,6 +279,7 @@ class SimulationServer:
                     break  # grid is full — fewer robots than requested, not a hang
             while len(world.robots) > count:
                 world.remove_robot()
+        self._refresh_last_state()
 
     def _serialize_board(self, sim: Simulator, board_mode: str, before: dict, totals: dict) -> dict:
         world = sim.world

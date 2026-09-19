@@ -113,9 +113,9 @@ const loadChart = new Chart(document.getElementById("load-chart"), {
       y: {
         display: true,
         beginAtZero: true,
-        max: 2, // ms -- capped so one rare slow tick can't blow out the whole axis
+        max: 2, // ms -- overwritten in render() to scale with robot_count; this is just the initial value
         grid: { display: false },
-        ticks: { stepSize: 1, font: { size: 13 }, callback: (v) => `${v}ms` }, // 0ms, 1ms, 2ms
+        ticks: { stepSize: 1, font: { size: 13 }, callback: (v) => `${v}ms` },
       },
     },
   },
@@ -190,6 +190,15 @@ function render(state) {
   drawFloor(floorNaiveCtx, floorNaiveCanvas, state.grid_size, naive.robots);
   drawFloor(floorWardenCtx, floorWardenCanvas, state.grid_size, warden.robots);
 
+  // A fixed cap, same as before, but one that scales with the current robot count
+  // instead of a single constant: at 1000 robots server_seconds routinely exceeds the
+  // old flat 2ms cap (measured up to ~20ms), which would just pin the line at the top
+  // and hide all detail. Recomputed from config (robot_count), not from the observed
+  // data stream itself, so it's still a fixed axis, not a per-tick-smoothed one.
+  const cpuAxisMax = Math.max(2, naive.robot_count * 0.05);
+  loadChart.options.scales.y.max = cpuAxisMax;
+  loadChart.options.scales.y.ticks.stepSize = cpuAxisMax / 2;
+
   // The server keeps broadcasting the same frozen state every tick while paused (so
   // controls stay responsive), which would otherwise push duplicate points onto the
   // rolling window and make the sparkline visibly scroll even though nothing changed.
@@ -258,63 +267,112 @@ const OUTCOME_COLORS = {
   idle: COLORS.inkMuted,
 };
 
-function drawFloor(ctx, canvas, gridSize, robots) {
-  const cellSize = canvas.width / gridSize;
+// Gridlines never change tick-to-tick (only gridSize does, on a config change) but were
+// being fully re-stroked every single tick -- 2*(gridSize+1) separate stroke() calls,
+// wasted work at every tick regardless of grid size. Cached to an offscreen canvas once
+// per gridSize instead; both floor canvases share the cache since they're always the
+// same size and gridSize. Includes the panel-colored background fill too, replacing the
+// per-tick clearRect.
+let gridBackground = { gridSize: null, canvas: null };
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+function getGridBackground(gridSize, width, height) {
+  if (gridBackground.gridSize === gridSize && gridBackground.canvas) {
+    return gridBackground.canvas;
+  }
+  const bg = document.createElement("canvas");
+  bg.width = width;
+  bg.height = height;
+  const bgCtx = bg.getContext("2d");
+  const cellSize = width / gridSize;
 
-  ctx.strokeStyle = COLORS.line;
-  ctx.lineWidth = 1;
+  bgCtx.fillStyle = COLORS.panel;
+  bgCtx.fillRect(0, 0, width, height);
+
+  bgCtx.strokeStyle = COLORS.line;
+  bgCtx.lineWidth = 1;
+  bgCtx.beginPath(); // one path for every line, one stroke() call total, not one per line
   for (let i = 0; i <= gridSize; i++) {
     const p = Math.round(i * cellSize) + 0.5; // crisp 1px lines, not antialiased blur
-    ctx.beginPath();
-    ctx.moveTo(p, 0);
-    ctx.lineTo(p, canvas.height);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, p);
-    ctx.lineTo(canvas.width, p);
-    ctx.stroke();
+    bgCtx.moveTo(p, 0);
+    bgCtx.lineTo(p, height);
+    bgCtx.moveTo(0, p);
+    bgCtx.lineTo(width, p);
   }
+  bgCtx.stroke();
+
+  gridBackground = { gridSize, canvas: bg };
+  return bg;
+}
+
+function drawFloor(ctx, canvas, gridSize, robots) {
+  const cellSize = canvas.width / gridSize;
+  ctx.drawImage(getGridBackground(gridSize, canvas.width, canvas.height), 0, 0);
 
   const radius = cellSize * 0.32;
 
+  // Batched by style: one path with every robot's arc/line in it, then one fill() or
+  // stroke() call for the whole batch, instead of up to 4 separate canvas calls PER
+  // ROBOT (which is what this used to do — a real bottleneck at hundreds of robots,
+  // since canvas draw-call overhead dominates over the trivial per-robot math).
+
+  // Halo: same color for every robot, so it's just one pass regardless of outcome.
+  ctx.fillStyle = COLORS.panel;
+  ctx.beginPath();
   for (const robot of robots) {
     const cx = robot.x * cellSize + cellSize / 2;
     const cy = robot.y * cellSize + cellSize / 2;
-
-    // A light halo behind each dot lifts it off the gridlines without a heavy dark
-    // outline — a softer, flatter treatment than an ink border on every robot.
-    ctx.fillStyle = COLORS.panel;
-    ctx.beginPath();
+    ctx.moveTo(cx + radius + 1.5, cy);
     ctx.arc(cx, cy, radius + 1.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = OUTCOME_COLORS[robot.outcome] || COLORS.inkMuted;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.fill();
-
-    if (robot.dx !== 0 || robot.dy !== 0) {
-      ctx.strokeStyle = COLORS.ink;
-      ctx.lineWidth = 1.5;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + robot.dx * radius * 1.5, cy + robot.dy * radius * 1.5);
-      ctx.stroke();
-    }
-
-    // Near-miss: the filter/coordinator approved this move but ground truth caught it —
-    // a distinct ring, not red, so it isn't mistaken for a caught conflict.
-    if (robot.near_miss) {
-      ctx.strokeStyle = COLORS.nearMiss;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius * 1.7, 0, Math.PI * 2);
-      ctx.stroke();
-    }
   }
+  ctx.fill();
+
+  // Main dot: one pass per outcome color (at most 4 fill() calls total, not one per robot).
+  for (const outcome in OUTCOME_COLORS) {
+    ctx.fillStyle = OUTCOME_COLORS[outcome];
+    ctx.beginPath();
+    let any = false;
+    for (const robot of robots) {
+      if ((robot.outcome in OUTCOME_COLORS ? robot.outcome : "idle") !== outcome) continue;
+      any = true;
+      const cx = robot.x * cellSize + cellSize / 2;
+      const cy = robot.y * cellSize + cellSize / 2;
+      ctx.moveTo(cx + radius, cy);
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    }
+    if (any) ctx.fill();
+  }
+
+  // Direction line: one pass for every moving robot.
+  ctx.strokeStyle = COLORS.ink;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  let anyMoving = false;
+  for (const robot of robots) {
+    if (robot.dx === 0 && robot.dy === 0) continue;
+    anyMoving = true;
+    const cx = robot.x * cellSize + cellSize / 2;
+    const cy = robot.y * cellSize + cellSize / 2;
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + robot.dx * radius * 1.5, cy + robot.dy * radius * 1.5);
+  }
+  if (anyMoving) ctx.stroke();
+
+  // Near-miss ring: the filter/coordinator approved this move but ground truth caught
+  // it — a distinct ring, not red, so it isn't mistaken for a caught conflict.
+  ctx.strokeStyle = COLORS.nearMiss;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  let anyNearMiss = false;
+  for (const robot of robots) {
+    if (!robot.near_miss) continue;
+    anyNearMiss = true;
+    const cx = robot.x * cellSize + cellSize / 2;
+    const cy = robot.y * cellSize + cellSize / 2;
+    ctx.moveTo(cx + radius * 1.7, cy);
+    ctx.arc(cx, cy, radius * 1.7, 0, Math.PI * 2);
+  }
+  if (anyNearMiss) ctx.stroke();
 }
 
 // --- Controls --------------------------------------------------------------

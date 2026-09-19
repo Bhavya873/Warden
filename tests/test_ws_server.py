@@ -340,6 +340,34 @@ def test_reset_while_paused_is_visible_immediately():
     assert server._last_state["paused"] is True  # reset doesn't implicitly resume
 
 
+def test_set_robot_count_while_paused_is_visible_immediately():
+    # Regression: set_robot_count() correctly changed the sim's actual robot count, but
+    # left _last_state (what broadcast_loop actually re-sends every tick while paused)
+    # untouched -- so dragging the Robots slider while paused silently did nothing
+    # visible until Play was pressed, even though the server-side state had genuinely
+    # changed. Same bug class as the reset()-while-paused one above, different action.
+    server = SimulationServer()
+    server.set_paused(True)
+    server._last_state = server.step_and_serialize()  # simulate broadcast_loop's last cached send
+    assert server._last_state["boards"]["naive"]["robot_count"] == 20  # DEFAULT_ROBOT_COUNT
+
+    server.set_robot_count(45)
+
+    assert server._last_state["boards"]["naive"]["robot_count"] == 45
+    assert server._last_state["boards"]["warden"]["robot_count"] == 45
+
+
+def test_set_grid_size_while_paused_is_visible_immediately():
+    server = SimulationServer()
+    server.set_paused(True)
+    server._last_state = server.step_and_serialize()
+    assert server._last_state["grid_size"] == 30  # DEFAULT_GRID_SIZE
+
+    server.set_grid_size(15)
+
+    assert server._last_state["grid_size"] == 15
+
+
 def test_set_broadcast_lag_is_live_and_has_no_effect_in_naive_mode():
     server = SimulationServer()
     server.set_mode("warden")

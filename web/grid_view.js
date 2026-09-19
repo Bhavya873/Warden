@@ -36,6 +36,28 @@ const floorNaiveCtx = floorNaiveCanvas.getContext("2d");
 const floorWardenCanvas = document.getElementById("floor-warden");
 const floorWardenCtx = floorWardenCanvas.getContext("2d");
 
+// The canvases are fluid (width:100%; height:auto in style.css) but their backing-
+// store pixel size was a hardcoded 460x460 attribute -- the browser was rescaling that
+// bitmap to fit the actual (different, viewport-dependent) layout size on every paint,
+// and with no devicePixelRatio handling the result was blurry on top of that. Syncing
+// the backing store to the element's real on-screen size (in device pixels) removes
+// both problems; drawFloor's cellSize math already derives from canvas.width, so no
+// ctx.scale() is needed on top of this.
+function syncCanvasBackingSize(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const size = Math.round(canvas.clientWidth * dpr);
+  if (size > 0 && canvas.width !== size) {
+    canvas.width = size;
+    canvas.height = size; // square canvas, CSS keeps it square via height:auto
+    gridBackground.gridSize = null; // cache was sized for the old backing-store width
+  }
+}
+const canvasResizeObserver = new ResizeObserver((entries) => {
+  for (const entry of entries) syncCanvasBackingSize(entry.target);
+});
+canvasResizeObserver.observe(floorNaiveCanvas);
+canvasResizeObserver.observe(floorWardenCanvas);
+
 const playPauseBtn = document.getElementById("play-pause-btn");
 const resetBtn = document.getElementById("reset-btn");
 const robotCountInput = document.getElementById("robot-count");
@@ -280,13 +302,16 @@ const OUTCOME_COLORS = {
 // Gridlines never change tick-to-tick (only gridSize does, on a config change) but were
 // being fully re-stroked every single tick -- 2*(gridSize+1) separate stroke() calls,
 // wasted work at every tick regardless of grid size. Cached to an offscreen canvas once
-// per gridSize instead; both floor canvases share the cache since they're always the
-// same size and gridSize. Includes the panel-colored background fill too, replacing the
+// per (gridSize, width) instead -- both floor canvases share the cache when they're the
+// same size, which is the common case, but width is now part of the key (not just
+// gridSize) since the backing-store size is synced to the fluid layout and can change
+// independently of gridSize (see syncCanvasBackingSize above), unlike when it was a
+// fixed 460x460 constant. Includes the panel-colored background fill too, replacing the
 // per-tick clearRect.
-let gridBackground = { gridSize: null, canvas: null };
+let gridBackground = { gridSize: null, width: null, canvas: null };
 
 function getGridBackground(gridSize, width, height) {
-  if (gridBackground.gridSize === gridSize && gridBackground.canvas) {
+  if (gridBackground.gridSize === gridSize && gridBackground.width === width && gridBackground.canvas) {
     return gridBackground.canvas;
   }
   const bg = document.createElement("canvas");
@@ -310,7 +335,7 @@ function getGridBackground(gridSize, width, height) {
   }
   bgCtx.stroke();
 
-  gridBackground = { gridSize, canvas: bg };
+  gridBackground = { gridSize, width, canvas: bg };
   return bg;
 }
 

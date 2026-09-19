@@ -488,7 +488,12 @@ input[type="range"]:focus-visible {
    number spans both rows, vertically centered next to them. */
 .hero-stat {
   display: grid;
-  grid-template-columns: auto 1fr;
+  /* minmax(4ch, auto), not auto: #cmp-reduction-pct's textContent is rewritten every
+     tick (grid_view.js), and an auto column reflows this whole grid (and whatever
+     shares its ancestor width) every time the digit count changes -- 10x/sec. 4ch
+     covers the common case ("100%") without reflowing; genuinely wider values still
+     grow the column via the auto fallback. */
+  grid-template-columns: minmax(4ch, auto) 1fr;
   grid-template-rows: auto auto;
   column-gap: 16px;
   row-gap: 8px;

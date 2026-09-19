@@ -54,6 +54,16 @@ class GridWorld:
 
         self._rng = random.Random(seed)
         self._occupied: dict[Cell, int] = {}
+        # Coarse spatial hash over `_occupied`, purely a performance index (never
+        # authoritative, never read externally) so _distance_to_nearest_robot doesn't
+        # have to scan every occupied cell on every retarget -- at 1000 robots that
+        # O(n) scan, done 4x (TARGET_CANDIDATE_COUNT) every time any robot reaches its
+        # target, is what actually stalls the server's 100ms tick budget at max scale.
+        # Sized from density, not TARGET_LOCALITY_DIVISOR's target-selection radius --
+        # it doesn't need to track add_robot()/remove_robot() count changes afterward
+        # since bucket size only affects lookup speed, never correctness.
+        self._bucket_size = max(2, round(self.grid_size / max(1, robot_count**0.5)))
+        self._buckets: dict[tuple[int, int], set[Cell]] = {}
         self.robots: list[Robot] = []
         # A near-miss: `policy` approved a move (instant or confirmed) but the live
         # occupancy check below rejected it anyway, because ground truth had already
@@ -123,17 +133,53 @@ class GridWorld:
                     break
         return max(candidates, key=lambda cell: self._distance_to_nearest_robot(cell, exclude))
 
+    def _bucket_key(self, cell: Cell) -> tuple[int, int]:
+        x, y = cell
+        return (x // self._bucket_size, y // self._bucket_size)
+
+    def _occupy(self, cell: Cell, robot_id: int) -> None:
+        self._occupied[cell] = robot_id
+        self._buckets.setdefault(self._bucket_key(cell), set()).add(cell)
+
+    def _vacate(self, cell: Cell) -> None:
+        del self._occupied[cell]
+        key = self._bucket_key(cell)
+        bucket = self._buckets[key]
+        bucket.discard(cell)
+        if not bucket:
+            del self._buckets[key]  # keep the dict from growing unbounded as robots roam
+
     def _distance_to_nearest_robot(self, cell: Cell, exclude: Cell) -> int:
+        # Exact nearest-neighbor search over the bucket index (same result as scanning
+        # every occupied cell, just without actually doing that): scan outward ring by
+        # ring, stop once the next ring's closest possible cell can't beat the current
+        # best. Only touches nearby buckets, not all of `_occupied`.
         cx, cy = cell
-        return min(
-            (abs(cx - ox) + abs(cy - oy) for (ox, oy) in self._occupied if (ox, oy) != exclude),
-            default=self.grid_size * 2,  # no other robots on the grid — nothing to avoid
-        )
+        B = self._bucket_size
+        bx, by = cx // B, cy // B
+        best = self.grid_size * 2  # matches the old "no other robots" default
+        max_k = self.grid_size // B + 1
+        k = 0
+        while k <= max_k:
+            if k > 0 and (k - 1) * B >= best:
+                break  # every cell in ring k is farther than `best` already
+            for gx in range(bx - k, bx + k + 1):
+                for gy in range(by - k, by + k + 1):
+                    if max(abs(gx - bx), abs(gy - by)) != k:
+                        continue  # interior already scanned in a smaller ring
+                    for ox, oy in self._buckets.get((gx, gy), ()):
+                        if (ox, oy) == exclude:
+                            continue
+                        d = abs(cx - ox) + abs(cy - oy)
+                        if d < best:
+                            best = d
+            k += 1
+        return best
 
     def _spawn_robots(self) -> None:
         for robot_id in range(self.robot_count):
             x, y = self._random_free_cell()
-            self._occupied[(x, y)] = robot_id
+            self._occupy((x, y), robot_id)
             target_x, target_y = self._random_target(exclude=(x, y))
             self.robots.append(Robot(robot_id, x, y, target_x, target_y))
 
@@ -195,9 +241,9 @@ class GridWorld:
                     self.near_miss_robot_ids.append(robot.robot_id)
                 continue  # blocked this tick — try again next tick
 
-            del self._occupied[(robot.x, robot.y)]
+            self._vacate((robot.x, robot.y))
             robot.x, robot.y = next_cell
-            self._occupied[next_cell] = robot.robot_id
+            self._occupy(next_cell, robot.robot_id)
             robot.consecutive_blocked_ticks = 0
 
             if (robot.x, robot.y) == (robot.target_x, robot.target_y):
@@ -226,7 +272,7 @@ class GridWorld:
         x, y = self._random_free_cell()
         robot_id = self._next_robot_id
         self._next_robot_id += 1
-        self._occupied[(x, y)] = robot_id
+        self._occupy((x, y), robot_id)
         target_x, target_y = self._random_target(exclude=(x, y))
         robot = Robot(robot_id, x, y, target_x, target_y)
         self.robots.append(robot)
@@ -238,6 +284,6 @@ class GridWorld:
         if not self.robots:
             return None
         robot = self.robots.pop()
-        del self._occupied[(robot.x, robot.y)]
+        self._vacate((robot.x, robot.y))
         self.robot_count -= 1
         return robot

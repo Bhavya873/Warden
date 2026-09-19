@@ -511,6 +511,28 @@ input[type="range"]:focus-visible {
   color: var(--muted-foreground);
 }
 
+/* Sits above .hero-stat (and its dividing line below), naming the two columns the
+   table further down shares — not tied to the table markup itself, since the
+   hero-stat sits between them either way. */
+.compare-legend {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.compare-legend-item {
+  width: 140px; /* matches .compare td's width, so these line up with its columns */
+  text-align: right;
+  padding: 0 8px;
+}
+
+.compare-legend .dot {
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
 .compare {
   width: 100%;
   border-collapse: collapse;
@@ -521,26 +543,6 @@ input[type="range"]:focus-visible {
   padding: 12px 8px;
   text-align: right;
   border-bottom: 1px solid var(--border);
-}
-
-/* Compact on purpose — these exist so "Baseline"/"Warden" sit directly above their
-   column (guaranteed alignment, unlike a label floating outside the table), without
-   reading as a fully-fledged extra row the way the body rows do. */
-.compare thead th {
-  padding: 0 8px 6px;
-  font-size: 0.75rem;
-  font-weight: 400;
-  color: var(--muted-foreground);
-  border-bottom: none;
-}
-
-.compare thead th:first-child {
-  text-align: left;
-}
-
-.compare thead .dot {
-  margin-right: 5px;
-  vertical-align: middle;
 }
 
 .compare tbody th {
@@ -563,6 +565,7 @@ input[type="range"]:focus-visible {
   justify-content: space-between;
   align-items: baseline;
   margin: 20px 0 8px;
+  padding-left: 8px; /* matches .compare th/td's padding, so the label lines up with "Moves" etc. */
 }
 
 .sparkline-label {
@@ -588,4 +591,5 @@ input[type="range"]:focus-visible {
 .sparkline-wrap {
   position: relative;
   height: 130px;
+  padding-left: 8px; /* matches .compare th/td's padding, so the y-axis lines up with "Moves" etc. */
 }

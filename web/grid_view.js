@@ -47,6 +47,10 @@ const statTick = document.getElementById("stat-tick");
 const loadAvgNaiveEl = document.getElementById("load-avg-naive");
 const loadAvgWardenEl = document.getElementById("load-avg-warden");
 
+// Rolling history for Network queue's average, same window as the CPU-usage chart
+// data (LOAD_CHART_WINDOW ticks) -- not charted itself, just averaged for its row.
+const queueHistory = { naive: [], warden: [] };
+
 const compareEls = {
   naive: {
     moves: document.getElementById("cmp-naive-moves"),
@@ -189,11 +193,14 @@ function render(state) {
     loadChart.update("none");
     loadAvgNaiveEl.textContent = `${average(loadChart.data.datasets[0].data).toFixed(0)}%`;
     loadAvgWardenEl.textContent = `${average(loadChart.data.datasets[1].data).toFixed(0)}%`;
+
+    pushRolling(queueHistory.naive, queuePct(naive));
+    pushRolling(queueHistory.warden, queuePct(warden));
   }
 
   statTick.textContent = `(tick ${naive.tick})`;
-  updateCompareRow(compareEls.naive, naive);
-  updateCompareRow(compareEls.warden, warden);
+  updateCompareRow(compareEls.naive, naive, queueHistory.naive);
+  updateCompareRow(compareEls.warden, warden, queueHistory.warden);
   updateReductionHero(naive, warden);
 
   syncControls(naive.robot_count, state.grid_size, state.broadcast_lag);
@@ -205,9 +212,9 @@ function render(state) {
   }
 }
 
-function updateCompareRow(els, board) {
+function updateCompareRow(els, board, queueHist) {
   els.moves.textContent = board.totals.instant_moves + board.totals.confirmed_checks;
-  els.queue.textContent = `${queuePct(board).toFixed(0)}%`;
+  els.queue.textContent = `${average(queueHist).toFixed(0)}%`;
   els.conflicts.textContent = board.totals.conflicts_avoided;
 }
 
@@ -344,6 +351,8 @@ resetBtn.addEventListener("click", () => {
   loadChart.update("none");
   loadAvgNaiveEl.textContent = "0%";
   loadAvgWardenEl.textContent = "0%";
+  queueHistory.naive.length = 0;
+  queueHistory.warden.length = 0;
 });
 
 broadcastLagSelect.addEventListener("change", () => {

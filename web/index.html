@@ -136,22 +136,22 @@
           <tr>
             <th
               scope="row"
-              title="Requests currently in flight to the coordinator, not yet resolved, as a % of robot_count — each robot has at most one pending confirm-check at a time, so this is a real, bounded percentage, not a raw count."
-            >
-              Network queue
-            </th>
-            <td class="mono" id="cmp-naive-queue" aria-label="Baseline">0%</td>
-            <td class="mono" id="cmp-warden-queue" aria-label="Warden">0%</td>
-          </tr>
-          <tr>
-            <th
-              scope="row"
               title="Real collisions never happen — the grid guarantees it structurally. This counts collisions the server prevented by blocking a move when two robots wanted the same cell."
             >
               Collisions prevented
             </th>
             <td class="mono" id="cmp-naive-conflicts" aria-label="Baseline">0</td>
             <td class="mono" id="cmp-warden-conflicts" aria-label="Warden">0</td>
+          </tr>
+          <tr>
+            <th
+              scope="row"
+              title="Average requests in flight to the coordinator, not yet resolved, as a % of robot_count over the visible window — each robot has at most one pending confirm-check at a time, so this is a real, bounded percentage, not a raw count."
+            >
+              Average network queue
+            </th>
+            <td class="mono" id="cmp-naive-queue" aria-label="Baseline">0%</td>
+            <td class="mono" id="cmp-warden-queue" aria-label="Warden">0%</td>
           </tr>
           <tr>
             <th

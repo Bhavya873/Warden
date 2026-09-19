@@ -561,50 +561,11 @@ input[type="range"]:focus-visible {
   width: 140px;
 }
 
-.sparkline-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin: 20px 0 8px;
-  padding-left: 8px; /* matches .compare th/td's padding, so the label lines up with "Moves" etc. */
-}
-
-.sparkline-label {
-  /* Matches .compare tbody th (e.g. "Conflicts prevented") -- same font, size, and
-     color, so it reads as one more row label rather than a separately-styled caption. */
-  margin: 0;
-  font-size: 0.875rem;
-  font-weight: 400;
-  color: var(--muted-foreground);
-}
-
-.sparkline-avg {
-  display: flex;
-}
-
-.sparkline-avg-item {
-  width: 140px; /* matches .compare td's width, so these line up with its columns */
-  text-align: right;
-  padding: 0 8px;
-}
-
-/* Same font/size/format as .compare tbody td -- these are the same kind of number,
-   just averaged instead of a running total. */
-.sparkline-avg .mono {
-  font-size: 1.4rem;
-}
-
-.sparkline-avg .dot {
-  margin-right: 6px;
-  vertical-align: middle;
-}
-
-.sparkline-avg .dot {
-  margin-right: 5px;
-}
-
 .sparkline-wrap {
+  /* Now sits directly under the table (the averages moved into it as a row), so this
+     only needs to line its own y-axis up with the table columns above it. */
   position: relative;
+  margin-top: 12px;
   height: 130px;
   padding-left: 8px; /* matches .compare th/td's padding, so the y-axis lines up with "Moves" etc. */
 }

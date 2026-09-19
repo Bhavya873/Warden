@@ -155,15 +155,15 @@
             <td class="mono" id="cmp-naive-conflicts" aria-label="Baseline">0</td>
             <td class="mono" id="cmp-warden-conflicts" aria-label="Warden">0</td>
           </tr>
+          <tr>
+            <th scope="row" title="Average network requests in flight over the visible window">
+              Network requests queued over time
+            </th>
+            <td class="mono" id="load-avg-naive" aria-label="Baseline">0</td>
+            <td class="mono" id="load-avg-warden" aria-label="Warden">0</td>
+          </tr>
         </tbody>
       </table>
-      <div class="sparkline-header">
-        <p class="sparkline-label">Network requests queued over time</p>
-        <div class="sparkline-avg" title="Average network requests in flight over the visible window">
-          <span class="sparkline-avg-item"><span class="dot dot-naive"></span><span class="mono" id="load-avg-naive">0</span></span>
-          <span class="sparkline-avg-item"><span class="dot dot-warden"></span><span class="mono" id="load-avg-warden">0</span></span>
-        </div>
-      </div>
       <div class="sparkline-wrap">
         <canvas id="load-chart"></canvas>
       </div>

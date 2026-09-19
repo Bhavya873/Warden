@@ -108,8 +108,9 @@ const loadChart = new Chart(document.getElementById("load-chart"), {
       y: {
         display: true,
         beginAtZero: true,
+        max: 100, // a percentage of robot_count now, not a raw count -- fixed, not smoothed
         grid: { display: false },
-        ticks: { maxTicksLimit: 4, font: { size: 13 } },
+        ticks: { maxTicksLimit: 4, font: { size: 13 }, callback: (v) => `${v}%` },
       },
     },
   },
@@ -124,22 +125,14 @@ function average(values) {
   return values.length > 0 ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
 }
 
-// Chart.js's built-in auto-scaling recomputes the axis max every single tick, so a
-// value oscillating quickly (e.g. 80 <-> 120) makes the whole axis visibly snap back
-// and forth. An EMA-smoothed max grows fast (so real spikes are never clipped) but
-// shrinks slowly (so a brief dip doesn't yank the axis back down), which reads as a
-// steady axis instead of a jittery one.
-function makeSmoothedMax(seed) {
-  let current = seed;
-  return function smoothedMax(dataMax) {
-    const target = Math.max(dataMax * 1.15, seed);
-    const alpha = target > current ? 0.3 : 0.02;
-    current += (target - current) * alpha;
-    return current;
-  };
+// Network requests queued, as a % of robot_count: each robot has at most one pending
+// confirm-check at a time, so this is bounded [0, 100] -- a real percentage, not a raw
+// count with no natural ceiling. That fixed ceiling is also why the chart's y-axis can
+// just be a flat 0-100 (see loadChart's scales.y above) instead of needing the
+// EMA-smoothed dynamic max a raw, unbounded count would have required.
+function queuePct(board) {
+  return board.robot_count > 0 ? (board.stats.queue_depth / board.robot_count) * 100 : 0;
 }
-
-let loadSmoothedMax = makeSmoothedMax(5); // reassigned on reset — see resetBtn handler
 
 // --- WebSocket -----------------------------------------------------------
 
@@ -179,14 +172,12 @@ function render(state) {
   // controls stay responsive), which would otherwise push duplicate points onto the
   // rolling window and make the sparkline visibly scroll even though nothing changed.
   if (!state.paused) {
-    pushRolling(loadChart.data.datasets[0].data, naive.stats.queue_depth);
-    pushRolling(loadChart.data.datasets[1].data, warden.stats.queue_depth);
+    pushRolling(loadChart.data.datasets[0].data, queuePct(naive));
+    pushRolling(loadChart.data.datasets[1].data, queuePct(warden));
     pushRolling(loadChart.data.labels, naive.tick); // both boards are stepped together, one shared timeline
-    const loadDataMax = Math.max(...loadChart.data.datasets[0].data, ...loadChart.data.datasets[1].data);
-    loadChart.options.scales.y.max = loadSmoothedMax(loadDataMax);
     loadChart.update("none");
-    loadAvgNaiveEl.textContent = `${average(loadChart.data.datasets[0].data).toFixed(1)}`;
-    loadAvgWardenEl.textContent = `${average(loadChart.data.datasets[1].data).toFixed(1)}`;
+    loadAvgNaiveEl.textContent = `${average(loadChart.data.datasets[0].data).toFixed(0)}%`;
+    loadAvgWardenEl.textContent = `${average(loadChart.data.datasets[1].data).toFixed(0)}%`;
   }
 
   statTick.textContent = `(tick ${naive.tick})`;
@@ -205,7 +196,7 @@ function render(state) {
 
 function updateCompareRow(els, board) {
   els.moves.textContent = board.totals.instant_moves + board.totals.confirmed_checks;
-  els.load.textContent = board.stats.queue_depth;
+  els.load.textContent = `${queuePct(board).toFixed(0)}%`;
   els.conflicts.textContent = board.totals.conflicts_avoided;
 }
 
@@ -339,10 +330,9 @@ resetBtn.addEventListener("click", () => {
   loadChart.data.labels.length = 0;
   loadChart.data.datasets[0].data.length = 0;
   loadChart.data.datasets[1].data.length = 0;
-  loadSmoothedMax = makeSmoothedMax(5);
   loadChart.update("none");
-  loadAvgNaiveEl.textContent = "0";
-  loadAvgWardenEl.textContent = "0";
+  loadAvgNaiveEl.textContent = "0%";
+  loadAvgWardenEl.textContent = "0%";
 });
 
 broadcastLagSelect.addEventListener("change", () => {

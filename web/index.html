@@ -42,8 +42,7 @@
     <p class="abstract">
       The filter and ring buffer are written in Rust and exposed to Python through PyO3, so the
       performance critical part stays fast while the simulation logic stays easy to iterate on. A live
-      WebSocket dashboard runs Warden side by side against a naive always ask baseline, so the payoff is
-      something you watch happen rather than a number you have to take on faith.
+      WebSocket dashboard runs Warden side by side against a baseline that always asks the server, so the impact can be seen in real time.
     </p>
   </header>
 
@@ -137,12 +136,12 @@
           <tr>
             <th
               scope="row"
-              title="Requests currently in flight to the coordinator, not yet resolved — the honest proxy for network usage here. (Not a CPU percentage: this single-process demo shares one CPU between both boards, so a CPU-usage comparison wouldn't mean what it would for two separate services.)"
+              title="Requests currently in flight to the coordinator, not yet resolved, as a % of robot_count — each robot has at most one pending confirm-check at a time, so this is a real, bounded percentage, not a raw count. (Not a CPU percentage: this single-process demo shares one CPU between both boards, so a CPU-usage comparison wouldn't mean what it would for two separate services.)"
             >
               Network requests queued
             </th>
-            <td class="mono" id="cmp-naive-load" aria-label="Baseline">0</td>
-            <td class="mono" id="cmp-warden-load" aria-label="Warden">0</td>
+            <td class="mono" id="cmp-naive-load" aria-label="Baseline">0%</td>
+            <td class="mono" id="cmp-warden-load" aria-label="Warden">0%</td>
           </tr>
           <tr>
             <th
@@ -155,11 +154,11 @@
             <td class="mono" id="cmp-warden-conflicts" aria-label="Warden">0</td>
           </tr>
           <tr>
-            <th scope="row" title="Average network requests in flight over the visible window">
+            <th scope="row" title="Average of the row above (% of robot_count in flight) over the visible window — this is what the graph below plots">
               Network requests queued over time
             </th>
-            <td class="mono" id="load-avg-naive" aria-label="Baseline">0</td>
-            <td class="mono" id="load-avg-warden" aria-label="Warden">0</td>
+            <td class="mono" id="load-avg-naive" aria-label="Baseline">0%</td>
+            <td class="mono" id="load-avg-warden" aria-label="Warden">0%</td>
           </tr>
         </tbody>
       </table>

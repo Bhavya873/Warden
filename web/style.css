@@ -517,6 +517,7 @@ input[type="range"]:focus-visible {
 .compare-legend {
   display: flex;
   justify-content: flex-end;
+  margin-top: 12px;
   margin-bottom: 16px;
   font-size: 0.75rem;
   color: var(--muted-foreground);

@@ -44,6 +44,8 @@ const broadcastLagSelect = document.getElementById("broadcast-lag");
 const liveDot = document.getElementById("live-dot");
 const connectionText = document.getElementById("connection-text");
 const statTick = document.getElementById("stat-tick");
+const loadAvgNaiveEl = document.getElementById("load-avg-naive");
+const loadAvgWardenEl = document.getElementById("load-avg-warden");
 
 const compareEls = {
   naive: {
@@ -97,13 +99,24 @@ const loadChart = new Chart(document.getElementById("load-chart"), {
     maintainAspectRatio: false,
     animation: false,
     plugins: { legend: { display: false } },
-    scales: { x: { display: false }, y: { display: false, beginAtZero: true } },
+    scales: {
+      x: {
+        display: true,
+        grid: { display: false },
+        ticks: { maxTicksLimit: 5, font: { size: 10 } },
+      },
+      y: { display: false, beginAtZero: true },
+    },
   },
 });
 
 function pushRolling(data, value) {
   data.push(value);
   if (data.length > LOAD_CHART_WINDOW) data.shift();
+}
+
+function average(values) {
+  return values.length > 0 ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
 }
 
 // Chart.js's built-in auto-scaling recomputes the axis max every single tick, so a
@@ -163,6 +176,8 @@ function render(state) {
   const loadDataMax = Math.max(...loadChart.data.datasets[0].data, ...loadChart.data.datasets[1].data);
   loadChart.options.scales.y.max = loadSmoothedMax(loadDataMax);
   loadChart.update("none");
+  loadAvgNaiveEl.textContent = `avg ${average(loadChart.data.datasets[0].data).toFixed(1)}`;
+  loadAvgWardenEl.textContent = `avg ${average(loadChart.data.datasets[1].data).toFixed(1)}`;
 
   statTick.textContent = `(tick ${naive.tick})`;
   updateCompareRow(compareEls.naive, naive);

@@ -161,7 +161,13 @@
           </tr>
         </tbody>
       </table>
-      <p class="sparkline-label">Server load over time</p>
+      <div class="sparkline-header">
+        <p class="sparkline-label">Server load over time</p>
+        <div class="sparkline-avg" title="Average server load over the visible window">
+          <span><span class="dot dot-naive"></span><span class="mono" id="load-avg-naive">avg 0</span></span>
+          <span><span class="dot dot-warden"></span><span class="mono" id="load-avg-warden">avg 0</span></span>
+        </div>
+      </div>
       <div class="sparkline-wrap">
         <canvas id="load-chart"></canvas>
       </div>

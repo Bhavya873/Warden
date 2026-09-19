@@ -534,13 +534,31 @@ input[type="range"]:focus-visible {
   border-bottom: none;
 }
 
-.sparkline-label {
+.sparkline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
   margin: 20px 0 8px;
+}
+
+.sparkline-label {
+  margin: 0;
   font-size: 0.75rem;
   color: var(--muted-foreground);
 }
 
+.sparkline-avg {
+  display: flex;
+  gap: 14px;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.sparkline-avg .dot {
+  margin-right: 5px;
+}
+
 .sparkline-wrap {
   position: relative;
-  height: 64px;
+  height: 80px;
 }

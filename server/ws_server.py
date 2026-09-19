@@ -80,6 +80,7 @@ construction — not a coincidence of this demo's random seeds.
 """
 
 import asyncio
+import contextlib
 import json
 import mimetypes
 import os
@@ -444,11 +445,15 @@ class SimulationServer:
 
     async def handle_client(self, websocket) -> None:
         self.clients.add(websocket)
+        broadcast_task = asyncio.create_task(self.broadcast_loop())
         try:
             async for raw_message in websocket:
                 self.handle_control_message(raw_message)
         finally:
             self.clients.discard(websocket)
+            broadcast_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await broadcast_task
 
     async def broadcast_loop(self) -> None:
         # ponytail: only steps the sim while someone's actually connected -- no clients,
@@ -468,11 +473,16 @@ class SimulationServer:
             await asyncio.sleep(TICK_INTERVAL_SECONDS)
 
 
+async def _handle_connection(websocket) -> None:
+    # ponytail: one SimulationServer per connection -- each browser tab/device gets its
+    # own independent simulation instead of everyone sharing (and stomping on) one.
+    await SimulationServer().handle_client(websocket)
+
+
 async def run_server(host: str = HOST, port: int = PORT) -> None:
-    server_state = SimulationServer()
-    async with websockets.serve(server_state.handle_client, host, port, process_request=serve_static):
+    async with websockets.serve(_handle_connection, host, port, process_request=serve_static):
         print(f"Warden server listening on http://{host}:{port} (dashboard + WS on the same port)")
-        await server_state.broadcast_loop()
+        await asyncio.Future()
 
 
 if __name__ == "__main__":

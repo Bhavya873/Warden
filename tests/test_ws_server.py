@@ -5,7 +5,7 @@ from http import HTTPStatus
 
 import websockets
 
-from server.ws_server import MAX_GRID_SIZE, MAX_ROBOT_COUNT, SimulationServer, serve_static
+from server.ws_server import MAX_GRID_SIZE, MAX_ROBOT_COUNT, SimulationServer, _handle_connection, serve_static
 
 
 def test_step_and_serialize_shape():
@@ -502,33 +502,56 @@ def test_serve_static_blocks_path_traversal():
 
 def test_server_end_to_end_over_real_websocket():
     async def body():
-        server_state = SimulationServer()
-        async with websockets.serve(server_state.handle_client, "localhost", 0) as ws_server:
+        # _handle_connection is what run_server actually wires up: a fresh
+        # SimulationServer per connection, owning its own broadcast loop internally.
+        async with websockets.serve(_handle_connection, "localhost", 0) as ws_server:
             port = ws_server.sockets[0].getsockname()[1]
-            loop_task = asyncio.ensure_future(server_state.broadcast_loop())
-            try:
-                async with websockets.connect(f"ws://localhost:{port}") as client:
+            async with websockets.connect(f"ws://localhost:{port}") as client:
+                raw = await asyncio.wait_for(client.recv(), timeout=2)
+                state = json.loads(raw)
+                # split is the server's real default now — the shipped frontend
+                # never sends set_mode, so this is what a fresh connection actually
+                # gets, not a special case to opt into.
+                assert state["type"] == "tick_split"
+                initial_robot_count = state["boards"]["naive"]["robot_count"]
+
+                await client.send(json.dumps({"action": "set_robot_count", "count": initial_robot_count + 5}))
+
+                state = {}
+                for _ in range(30):
                     raw = await asyncio.wait_for(client.recv(), timeout=2)
                     state = json.loads(raw)
-                    # split is the server's real default now — the shipped frontend
-                    # never sends set_mode, so this is what a fresh connection actually
-                    # gets, not a special case to opt into.
-                    assert state["type"] == "tick_split"
-                    initial_robot_count = state["boards"]["naive"]["robot_count"]
+                    if state["boards"]["naive"]["robot_count"] == initial_robot_count + 5:
+                        break
+                assert state["boards"]["naive"]["robot_count"] == initial_robot_count + 5
+                assert state["boards"]["warden"]["robot_count"] == initial_robot_count + 5
 
-                    await client.send(json.dumps({"action": "set_robot_count", "count": initial_robot_count + 5}))
+    asyncio.run(body())
 
-                    state = {}
-                    for _ in range(30):
-                        raw = await asyncio.wait_for(client.recv(), timeout=2)
-                        state = json.loads(raw)
-                        if state["boards"]["naive"]["robot_count"] == initial_robot_count + 5:
-                            break
-                    assert state["boards"]["naive"]["robot_count"] == initial_robot_count + 5
-                    assert state["boards"]["warden"]["robot_count"] == initial_robot_count + 5
-            finally:
-                loop_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await loop_task
+
+def test_sessions_are_isolated_per_connection():
+    async def body():
+        async with websockets.serve(_handle_connection, "localhost", 0) as ws_server:
+            port = ws_server.sockets[0].getsockname()[1]
+            async with websockets.connect(f"ws://localhost:{port}") as client_a, \
+                    websockets.connect(f"ws://localhost:{port}") as client_b:
+                raw_a = await asyncio.wait_for(client_a.recv(), timeout=2)
+                raw_b = await asyncio.wait_for(client_b.recv(), timeout=2)
+                initial_count = json.loads(raw_a)["boards"]["naive"]["robot_count"]
+                assert json.loads(raw_b)["boards"]["naive"]["robot_count"] == initial_count
+
+                await client_a.send(json.dumps({"action": "set_robot_count", "count": initial_count + 5}))
+
+                # Give client_a's session a few ticks to apply and broadcast the change.
+                for _ in range(30):
+                    raw_a = await asyncio.wait_for(client_a.recv(), timeout=2)
+                    if json.loads(raw_a)["boards"]["naive"]["robot_count"] == initial_count + 5:
+                        break
+                assert json.loads(raw_a)["boards"]["naive"]["robot_count"] == initial_count + 5
+
+                # client_b's session must be untouched by client_a's change.
+                for _ in range(5):
+                    raw_b = await asyncio.wait_for(client_b.recv(), timeout=2)
+                    assert json.loads(raw_b)["boards"]["naive"]["robot_count"] == initial_count
 
     asyncio.run(body())

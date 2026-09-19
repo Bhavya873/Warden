@@ -415,12 +415,13 @@ function drawFloor(ctx, canvas, gridSize, robots) {
 // --- Controls --------------------------------------------------------------
 
 function syncControls(robotCount, gridSize, broadcastLag) {
-  // Don't stomp on a control the user is actively dragging.
-  if (document.activeElement !== robotCountInput) {
+  // Don't stomp on a control the user is actively dragging (or just released —
+  // `interacting`/GRACE_MS below cover why `activeElement` alone isn't enough on touch).
+  if (!robotCountInteracting()) {
     robotCountInput.value = robotCount;
     robotCountValue.textContent = robotCount;
   }
-  if (document.activeElement !== gridSizeInput) {
+  if (!gridSizeInteracting()) {
     gridSizeInput.value = gridSize;
     gridSizeValue.textContent = gridSize;
   }
@@ -464,9 +465,35 @@ broadcastLagSelect.addEventListener("change", () => {
 });
 
 const DEBOUNCE_MS = 150;
+// A broadcast (every 100ms) can land mid-drag before the debounce above fires, and
+// `document.activeElement` doesn't reliably stay on a range input during touch drags
+// (unlike mouse drags) — so syncControls() needs a sturdier "still interacting" signal.
+// GRACE_MS covers the debounce plus a couple of broadcast ticks after release too, since
+// stale broadcasts sent before the server applies the change can still be in flight.
+const GRACE_MS = 400;
+let robotCountLastEditAt = 0;
+let gridSizeLastEditAt = 0;
+let robotCountPointerDown = false;
+let gridSizePointerDown = false;
+
+function robotCountInteracting() {
+  return robotCountPointerDown || Date.now() - robotCountLastEditAt < GRACE_MS;
+}
+function gridSizeInteracting() {
+  return gridSizePointerDown || Date.now() - gridSizeLastEditAt < GRACE_MS;
+}
+
+robotCountInput.addEventListener("pointerdown", () => { robotCountPointerDown = true; });
+robotCountInput.addEventListener("pointerup", () => { robotCountPointerDown = false; });
+robotCountInput.addEventListener("pointercancel", () => { robotCountPointerDown = false; });
+gridSizeInput.addEventListener("pointerdown", () => { gridSizePointerDown = true; });
+gridSizeInput.addEventListener("pointerup", () => { gridSizePointerDown = false; });
+gridSizeInput.addEventListener("pointercancel", () => { gridSizePointerDown = false; });
+
 let robotCountDebounce = null;
 robotCountInput.addEventListener("input", () => {
   robotCountValue.textContent = robotCountInput.value;
+  robotCountLastEditAt = Date.now();
   clearTimeout(robotCountDebounce);
   robotCountDebounce = setTimeout(() => {
     send({ action: "set_robot_count", count: Number(robotCountInput.value) });
@@ -476,6 +503,7 @@ robotCountInput.addEventListener("input", () => {
 let gridSizeDebounce = null;
 gridSizeInput.addEventListener("input", () => {
   gridSizeValue.textContent = gridSizeInput.value;
+  gridSizeLastEditAt = Date.now();
   clearTimeout(gridSizeDebounce);
   gridSizeDebounce = setTimeout(() => {
     send({ action: "set_grid_size", size: Number(gridSizeInput.value) });

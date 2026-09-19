@@ -6,6 +6,7 @@
 // user-facing label for it, renamed because "Naive" read as unclear/judgmental.
 
 const WS_URL = "ws://localhost:8765";
+const CPU_AXIS_STEP = 5; // ms -- the CPU-usage graph's y-axis grows/shrinks in steps of this
 const LOAD_CHART_WINDOW = 150; // ticks of history kept for the rolling line chart
 const TICK_BUDGET_MS = 100; // matches server/ws_server.py's TICK_INTERVAL_SECONDS
 
@@ -113,9 +114,9 @@ const loadChart = new Chart(document.getElementById("load-chart"), {
       y: {
         display: true,
         beginAtZero: true,
-        max: 2, // ms -- overwritten in render() to scale with robot_count; this is just the initial value
+        max: CPU_AXIS_STEP, // overwritten in render() as data demands; this is just the initial value
         grid: { display: false },
-        ticks: { stepSize: 1, font: { size: 13 }, callback: (v) => `${v}ms` },
+        ticks: { stepSize: CPU_AXIS_STEP, font: { size: 13 }, callback: (v) => `${v}ms` },
       },
     },
   },
@@ -145,6 +146,22 @@ function average(values) {
 // keeps them genuinely independent on the chart, the way the simulations actually are.
 function stepMs(board) {
   return board.stats.server_seconds * 1000;
+}
+
+// The CPU-usage graph's y-axis max grows or shrinks by exactly CPU_AXIS_STEP at a time
+// -- up when the data reaches or exceeds it, down when it's comfortably (a full step)
+// below -- instead of a single fixed constant (which clips at high robot counts) or a
+// continuously-smoothed value (which isn't a "fixed" scale at all). Always a whole-
+// number multiple of CPU_AXIS_STEP, so the axis labels are always whole numbers too.
+let cpuAxisMax = CPU_AXIS_STEP; // reassigned on reset — see resetBtn handler
+function updateCpuAxisMax(dataMax) {
+  while (dataMax >= cpuAxisMax) {
+    cpuAxisMax += CPU_AXIS_STEP;
+  }
+  while (cpuAxisMax > CPU_AXIS_STEP && dataMax < cpuAxisMax - CPU_AXIS_STEP) {
+    cpuAxisMax -= CPU_AXIS_STEP;
+  }
+  loadChart.options.scales.y.max = cpuAxisMax;
 }
 
 // The table row shows this as a % of the server's fixed 100ms tick budget -- a real,
@@ -190,14 +207,7 @@ function render(state) {
   drawFloor(floorNaiveCtx, floorNaiveCanvas, state.grid_size, naive.robots);
   drawFloor(floorWardenCtx, floorWardenCanvas, state.grid_size, warden.robots);
 
-  // A fixed cap, same as before, but one that scales with the current robot count
-  // instead of a single constant: at 1000 robots server_seconds routinely exceeds the
-  // old flat 2ms cap (measured up to ~20ms), which would just pin the line at the top
-  // and hide all detail. Recomputed from config (robot_count), not from the observed
-  // data stream itself, so it's still a fixed axis, not a per-tick-smoothed one.
-  const cpuAxisMax = Math.max(2, naive.robot_count * 0.05);
-  loadChart.options.scales.y.max = cpuAxisMax;
-  loadChart.options.scales.y.ticks.stepSize = cpuAxisMax / 2;
+  updateCpuAxisMax(Math.max(stepMs(naive), stepMs(warden)));
 
   // The server keeps broadcasting the same frozen state every tick while paused (so
   // controls stay responsive), which would otherwise push duplicate points onto the
@@ -413,6 +423,8 @@ resetBtn.addEventListener("click", () => {
   loadChart.data.labels.length = 0;
   loadChart.data.datasets[0].data.length = 0;
   loadChart.data.datasets[1].data.length = 0;
+  cpuAxisMax = CPU_AXIS_STEP;
+  loadChart.options.scales.y.max = cpuAxisMax;
   loadChart.update("none");
   loadAvgNaiveEl.textContent = "0.00%";
   loadAvgWardenEl.textContent = "0.00%";

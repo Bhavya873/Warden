@@ -175,14 +175,19 @@ function render(state) {
   drawFloor(floorNaiveCtx, floorNaiveCanvas, state.grid_size, naive.robots);
   drawFloor(floorWardenCtx, floorWardenCanvas, state.grid_size, warden.robots);
 
-  pushRolling(loadChart.data.datasets[0].data, naive.stats.queue_depth);
-  pushRolling(loadChart.data.datasets[1].data, warden.stats.queue_depth);
-  pushRolling(loadChart.data.labels, naive.tick); // both boards are stepped together, one shared timeline
-  const loadDataMax = Math.max(...loadChart.data.datasets[0].data, ...loadChart.data.datasets[1].data);
-  loadChart.options.scales.y.max = loadSmoothedMax(loadDataMax);
-  loadChart.update("none");
-  loadAvgNaiveEl.textContent = `avg ${average(loadChart.data.datasets[0].data).toFixed(1)}`;
-  loadAvgWardenEl.textContent = `avg ${average(loadChart.data.datasets[1].data).toFixed(1)}`;
+  // The server keeps broadcasting the same frozen state every tick while paused (so
+  // controls stay responsive), which would otherwise push duplicate points onto the
+  // rolling window and make the sparkline visibly scroll even though nothing changed.
+  if (!state.paused) {
+    pushRolling(loadChart.data.datasets[0].data, naive.stats.queue_depth);
+    pushRolling(loadChart.data.datasets[1].data, warden.stats.queue_depth);
+    pushRolling(loadChart.data.labels, naive.tick); // both boards are stepped together, one shared timeline
+    const loadDataMax = Math.max(...loadChart.data.datasets[0].data, ...loadChart.data.datasets[1].data);
+    loadChart.options.scales.y.max = loadSmoothedMax(loadDataMax);
+    loadChart.update("none");
+    loadAvgNaiveEl.textContent = `avg ${average(loadChart.data.datasets[0].data).toFixed(1)}`;
+    loadAvgWardenEl.textContent = `avg ${average(loadChart.data.datasets[1].data).toFixed(1)}`;
+  }
 
   statTick.textContent = `(tick ${naive.tick})`;
   updateCompareRow(compareEls.naive, naive);

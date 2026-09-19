@@ -148,17 +148,20 @@ function stepMs(board) {
   return board.stats.server_seconds * 1000;
 }
 
-// A one-way high-water mark, not a live auto-range: the axis only ever grows, in whole
-// steps of CPU_AXIS_STEP, when the data hits a new record. It never shrinks on its own,
-// so it never jitters or resizes on ordinary tick-to-tick noise -- the only way to see
-// a smaller axis again is Reset (which puts a robot-count/grid-size change's effect on
-// scale into a clean new baseline instead of stranding a large leftover axis). Always a
-// whole-number multiple of CPU_AXIS_STEP, so the axis labels are always whole numbers.
+// Derived from the whole visible rolling window (LOAD_CHART_WINDOW ticks), not just
+// the latest tick's value -- a single noisy tick can't move it, since one point among
+// 150 barely shifts the window's max, but a real sustained change (e.g. dragging the
+// Robots slider down) shrinks it once the old high values scroll out of the window,
+// and a real spike grows it immediately. Always a whole-number multiple of
+// CPU_AXIS_STEP, so the axis labels are always whole numbers.
 let cpuAxisMax = CPU_AXIS_STEP; // reassigned on reset — see resetBtn handler
-function updateCpuAxisMax(dataMax) {
-  while (dataMax >= cpuAxisMax) {
-    cpuAxisMax += CPU_AXIS_STEP;
+function updateCpuAxisMax() {
+  const windowMax = Math.max(0, ...loadChart.data.datasets[0].data, ...loadChart.data.datasets[1].data);
+  let needed = CPU_AXIS_STEP;
+  while (windowMax >= needed) {
+    needed += CPU_AXIS_STEP;
   }
+  cpuAxisMax = needed;
   loadChart.options.scales.y.max = cpuAxisMax;
 }
 
@@ -205,8 +208,6 @@ function render(state) {
   drawFloor(floorNaiveCtx, floorNaiveCanvas, state.grid_size, naive.robots);
   drawFloor(floorWardenCtx, floorWardenCanvas, state.grid_size, warden.robots);
 
-  updateCpuAxisMax(Math.max(stepMs(naive), stepMs(warden)));
-
   // The server keeps broadcasting the same frozen state every tick while paused (so
   // controls stay responsive), which would otherwise push duplicate points onto the
   // rolling window and make the sparkline visibly scroll even though nothing changed.
@@ -214,6 +215,7 @@ function render(state) {
     pushRolling(loadChart.data.datasets[0].data, stepMs(naive));
     pushRolling(loadChart.data.datasets[1].data, stepMs(warden));
     pushRolling(loadChart.data.labels, naive.tick); // both boards are stepped together, one shared timeline
+    updateCpuAxisMax();
     loadChart.update("none");
     loadAvgNaiveEl.textContent = `${tickBudgetPct(average(loadChart.data.datasets[0].data)).toFixed(2)}%`;
     loadAvgWardenEl.textContent = `${tickBudgetPct(average(loadChart.data.datasets[1].data)).toFixed(2)}%`;

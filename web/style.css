@@ -499,7 +499,9 @@ input[type="range"]:focus-visible {
 }
 
 .hero-stat-number {
-  grid-row: 1 / span 2;
+  /* Row 1 only (not spanning into the compare-legend row below), so it centers
+     against just the "fewer requests... / Warden vs. Baseline" text next to it. */
+  grid-row: 1;
   align-self: center;
   font-size: 3.5rem; /* VT323 reads smaller than its font-size, same as .abstract */
   font-weight: 400; /* VT323 has no bold face */

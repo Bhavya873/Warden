@@ -136,22 +136,32 @@
           <tr>
             <th
               scope="row"
-              title="Each board's share of the real wall-clock time both boards' simulation steps took this tick, measured directly on the server. A genuine compute-cost comparison between the two coordinators — not a host-level CPU utilization percentage, which this single-process demo (both boards sharing one CPU) can't measure meaningfully."
+              title="Requests currently in flight to the coordinator, not yet resolved, as a % of robot_count — each robot has at most one pending confirm-check at a time, so this is a real, bounded percentage, not a raw count."
             >
-              Server CPU usage
+              Network queue
             </th>
-            <td class="mono" id="cmp-naive-load" aria-label="Baseline">0%</td>
-            <td class="mono" id="cmp-warden-load" aria-label="Warden">0%</td>
+            <td class="mono" id="cmp-naive-queue" aria-label="Baseline">0%</td>
+            <td class="mono" id="cmp-warden-queue" aria-label="Warden">0%</td>
           </tr>
           <tr>
             <th
               scope="row"
-              title="Real collisions never happen — the grid guarantees it structurally. This counts moves the server blocked because two robots wanted the same cell."
+              title="Real collisions never happen — the grid guarantees it structurally. This counts collisions the server prevented by blocking a move when two robots wanted the same cell."
             >
-              Conflicts prevented
+              Collisions prevented
             </th>
             <td class="mono" id="cmp-naive-conflicts" aria-label="Baseline">0</td>
             <td class="mono" id="cmp-warden-conflicts" aria-label="Warden">0</td>
+          </tr>
+          <tr>
+            <th
+              scope="row"
+              title="Each board's share of the real wall-clock time both boards' simulation steps took this tick, measured directly on the server. A genuine compute-cost comparison between the two coordinators — not a host-level CPU utilization percentage, which this single-process demo (both boards sharing one CPU) can't measure meaningfully."
+            >
+              Server CPU usage
+            </th>
+            <td class="mono" id="cmp-naive-cpu" aria-label="Baseline">0%</td>
+            <td class="mono" id="cmp-warden-cpu" aria-label="Warden">0%</td>
           </tr>
           <tr>
             <th scope="row" title="Average of the row above (CPU-time share) over the visible window — this is what the graph below plots">

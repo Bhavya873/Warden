@@ -5,7 +5,7 @@
 // "naive" is the wire-protocol/internal name (unchanged); "Baseline" is just the
 // user-facing label for it, renamed because "Naive" read as unclear/judgmental.
 
-const WS_URL = "ws://localhost:8765";
+const WS_URL = "wss://warden-warehouse-robots.up.railway.app";
 const CPU_AXIS_STEP = 5; // ms -- the CPU-usage graph's y-axis grows/shrinks in steps of this
 const LOAD_CHART_WINDOW = 150; // ticks of history kept for the rolling line chart
 const TICK_BUDGET_MS = 100; // matches server/ws_server.py's TICK_INTERVAL_SECONDS

@@ -45,13 +45,14 @@
   --brutal-border: 3px;
   --brutal-shadow-offset: 5px;
 
-  /* Silkscreen: a pixel/bitmap display face, built on a coarse grid rather than smooth
-     curves — a deliberately loud, retro-tech choice for a page about robots on a grid.
-     Ships in 400/700 only, and loses detail below ~13-14px, so the smallest captions on
-     the page are the one place legibility is genuinely traded for character here. Space
-     Mono stays for numeric data, unchanged — a pixel face isn't built for tabular digits. */
+  /* Silkscreen carries titles/labels/buttons — a pixel/bitmap display face, built on a
+     coarse grid rather than smooth curves. VT323 (the other CRT-terminal face on the
+     page, used on the abstract) now also carries every numeric readout, replacing Space
+     Mono, so the two retro-tech faces are used consistently instead of a third,
+     unrelated monospace showing up just for numbers. VT323 ships weight 400 only — see
+     the font-weight comments below on the few rules that assumed a bold face existed. */
   --font-sans: "Silkscreen", system-ui, sans-serif;
-  --font-mono: "Space Mono", ui-monospace, monospace;
+  --font-mono: "VT323", ui-monospace, monospace;
 }
 
 * {
@@ -171,14 +172,14 @@ body {
 }
 
 .abstract {
-  /* VT323: a CRT-terminal face, single weight (400) only. It reads smaller than its
-     font-size suggests (thin strokes, tall x-height), so it's bumped up a size and
-     given extra line-height here rather than reusing the base paragraph scale. */
-  font-family: "VT323", var(--font-mono), monospace;
+  /* VT323 (--font-mono): reads smaller than its font-size suggests (thin strokes, tall
+     x-height), so it's bumped up well past the base paragraph scale, with extra
+     line-height to match. */
+  font-family: var(--font-mono);
   margin: 12px 0 0;
   color: var(--muted-foreground);
-  font-size: 1.15rem;
-  line-height: 1.6;
+  font-size: 1.4rem;
+  line-height: 1.55;
 }
 
 .header-status {
@@ -228,7 +229,9 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
   gap: 32px;
-  align-items: start;
+  /* stretch (not start): .controls needs the full row height to push its last panel
+     down to the bottom of .floor-area — see .controls below. */
+  align-items: stretch;
 }
 
 @media (max-width: 760px) {
@@ -317,6 +320,7 @@ body {
   margin: 0;
   padding: 0;
   font-size: 0.82rem;
+  line-height: 20px; /* fixed so .controls's margin-bottom below can subtract it exactly */
   color: var(--muted-foreground);
 }
 
@@ -362,6 +366,18 @@ body {
   /* = .split-floor h3's line-height (24px) + margin-bottom (8px), so the first
      control panel's top edge lines up with the canvas top edge next to it. */
   margin-top: 32px;
+  /* = .floor-area's own gap (16px) + .legend's fixed line-height (20px) — .layout's
+     align-items: stretch gives this the full row height including the legend below
+     the canvases, so this pulls the bottom back up to the canvas's actual bottom
+     edge instead of the legend's. */
+  margin-bottom: 36px;
+}
+
+/* Simulation stays its natural height, right under it with the normal gap;
+   Configuration (the last panel) grows to fill the rest of .layout's stretched row
+   height, so ITS bottom edge — not a gap — lines up with the bottom of the grid. */
+.controls .panel:last-child {
+  flex: 1;
 }
 
 .controls .control:not(:last-child) {
@@ -379,7 +395,7 @@ body {
 
 .control .value {
   color: var(--primary);
-  font-weight: 700;
+  font-weight: 400; /* VT323 has no bold face */
 }
 
 select,
@@ -477,8 +493,8 @@ input[type="range"]:focus-visible {
 }
 
 .hero-stat-number {
-  font-size: 3rem;
-  font-weight: 700; /* Space Mono ships 400/700 only */
+  font-size: 3.5rem; /* VT323 reads smaller than its font-size, same as .abstract */
+  font-weight: 400; /* VT323 has no bold face */
   letter-spacing: -0.02em;
   color: var(--primary);
   line-height: 1;
@@ -507,11 +523,15 @@ input[type="range"]:focus-visible {
   border-bottom: 1px solid var(--border);
 }
 
+/* Compact on purpose — these exist so "Baseline"/"Warden" sit directly above their
+   column (guaranteed alignment, unlike a label floating outside the table), without
+   reading as a fully-fledged extra row the way the body rows do. */
 .compare thead th {
-  padding-top: 0;
-  font-size: 0.8125rem;
-  font-weight: 700;
+  padding: 0 8px 6px;
+  font-size: 0.75rem;
+  font-weight: 400;
   color: var(--muted-foreground);
+  border-bottom: none;
 }
 
 .compare thead th:first-child {
@@ -519,7 +539,7 @@ input[type="range"]:focus-visible {
 }
 
 .compare thead .dot {
-  margin-right: 6px;
+  margin-right: 5px;
   vertical-align: middle;
 }
 
@@ -532,8 +552,8 @@ input[type="range"]:focus-visible {
 }
 
 .compare tbody td {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1.4rem; /* VT323 reads smaller than its font-size, same as .abstract */
+  font-weight: 400; /* VT323 has no bold face */
   letter-spacing: -0.01em;
   width: 140px;
 }
@@ -569,5 +589,5 @@ input[type="range"]:focus-visible {
 
 .sparkline-wrap {
   position: relative;
-  height: 80px;
+  height: 130px;
 }

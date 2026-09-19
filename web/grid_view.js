@@ -25,7 +25,7 @@ const COLORS = {
 
 // Chart.js defaults assume a light page — set text/grid colors explicitly for the dark
 // theme, and match the page's typeface instead of the browser's default sans-serif.
-Chart.defaults.font.family = "'Silkscreen', system-ui, sans-serif";
+Chart.defaults.font.family = "'VT323', ui-monospace, monospace";
 Chart.defaults.color = COLORS.inkMuted;
 Chart.defaults.borderColor = COLORS.line;
 
@@ -103,13 +103,13 @@ const loadChart = new Chart(document.getElementById("load-chart"), {
       x: {
         display: true,
         grid: { display: false },
-        ticks: { maxTicksLimit: 5, font: { size: 10 } },
+        ticks: { maxTicksLimit: 5, font: { size: 13 } },
       },
       y: {
         display: true,
         beginAtZero: true,
         grid: { display: false },
-        ticks: { maxTicksLimit: 4, font: { size: 10 } },
+        ticks: { maxTicksLimit: 4, font: { size: 13 } },
       },
     },
   },

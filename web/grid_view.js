@@ -52,13 +52,11 @@ const compareEls = {
     moves: document.getElementById("cmp-naive-moves"),
     queue: document.getElementById("cmp-naive-queue"),
     conflicts: document.getElementById("cmp-naive-conflicts"),
-    cpu: document.getElementById("cmp-naive-cpu"),
   },
   warden: {
     moves: document.getElementById("cmp-warden-moves"),
     queue: document.getElementById("cmp-warden-queue"),
     conflicts: document.getElementById("cmp-warden-conflicts"),
-    cpu: document.getElementById("cmp-warden-cpu"),
   },
 };
 
@@ -194,8 +192,8 @@ function render(state) {
   }
 
   statTick.textContent = `(tick ${naive.tick})`;
-  updateCompareRow(compareEls.naive, naive, warden);
-  updateCompareRow(compareEls.warden, warden, naive);
+  updateCompareRow(compareEls.naive, naive);
+  updateCompareRow(compareEls.warden, warden);
   updateReductionHero(naive, warden);
 
   syncControls(naive.robot_count, state.grid_size, state.broadcast_lag);
@@ -207,11 +205,10 @@ function render(state) {
   }
 }
 
-function updateCompareRow(els, board, other) {
+function updateCompareRow(els, board) {
   els.moves.textContent = board.totals.instant_moves + board.totals.confirmed_checks;
   els.queue.textContent = `${queuePct(board).toFixed(0)}%`;
   els.conflicts.textContent = board.totals.conflicts_avoided;
-  els.cpu.textContent = `${cpuSharePct(board, other).toFixed(0)}%`;
 }
 
 function requestRate(board) {

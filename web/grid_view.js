@@ -148,18 +148,16 @@ function stepMs(board) {
   return board.stats.server_seconds * 1000;
 }
 
-// The CPU-usage graph's y-axis max grows or shrinks by exactly CPU_AXIS_STEP at a time
-// -- up when the data reaches or exceeds it, down when it's comfortably (a full step)
-// below -- instead of a single fixed constant (which clips at high robot counts) or a
-// continuously-smoothed value (which isn't a "fixed" scale at all). Always a whole-
-// number multiple of CPU_AXIS_STEP, so the axis labels are always whole numbers too.
+// A one-way high-water mark, not a live auto-range: the axis only ever grows, in whole
+// steps of CPU_AXIS_STEP, when the data hits a new record. It never shrinks on its own,
+// so it never jitters or resizes on ordinary tick-to-tick noise -- the only way to see
+// a smaller axis again is Reset (which puts a robot-count/grid-size change's effect on
+// scale into a clean new baseline instead of stranding a large leftover axis). Always a
+// whole-number multiple of CPU_AXIS_STEP, so the axis labels are always whole numbers.
 let cpuAxisMax = CPU_AXIS_STEP; // reassigned on reset — see resetBtn handler
 function updateCpuAxisMax(dataMax) {
   while (dataMax >= cpuAxisMax) {
     cpuAxisMax += CPU_AXIS_STEP;
-  }
-  while (cpuAxisMax > CPU_AXIS_STEP && dataMax < cpuAxisMax - CPU_AXIS_STEP) {
-    cpuAxisMax -= CPU_AXIS_STEP;
   }
   loadChart.options.scales.y.max = cpuAxisMax;
 }

@@ -25,7 +25,7 @@ const COLORS = {
 
 // Chart.js defaults assume a light page — set text/grid colors explicitly for the dark
 // theme, and match the page's typeface instead of the browser's default sans-serif.
-Chart.defaults.font.family = "'Source Sans 3', system-ui, sans-serif";
+Chart.defaults.font.family = "'Space Grotesk', system-ui, sans-serif";
 Chart.defaults.color = COLORS.inkMuted;
 Chart.defaults.borderColor = COLORS.line;
 

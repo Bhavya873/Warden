@@ -45,8 +45,13 @@
   --brutal-border: 3px;
   --brutal-shadow-offset: 5px;
 
-  --font-sans: "Source Sans 3", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  /* Space Grotesk + Space Mono: a pairing designed by the same foundry to be used
+     together, with real character (distinctive geometric quirks, tall ascenders) —
+     not the neutral corporate grotesque (Inter/Source Sans/IBM Plex) that's become the
+     reflexive "safe" default everywhere, AI-generated pages included. Also suits the
+     bold/blocky neobrutalist look better than a neutral sans would. */
+  --font-sans: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, monospace;
 }
 
 * {
@@ -160,7 +165,7 @@ body {
 
 .header-top h1 {
   font-size: 1.875rem;
-  font-weight: 800;
+  font-weight: 700; /* Space Grotesk's loaded weights top out at 700 */
   margin: 0;
   letter-spacing: -0.01em;
 }
@@ -469,7 +474,7 @@ input[type="range"]:focus-visible {
 
 .hero-stat-number {
   font-size: 3rem;
-  font-weight: 800;
+  font-weight: 700; /* Space Mono ships 400/700 only */
   letter-spacing: -0.02em;
   color: var(--primary);
   line-height: 1;

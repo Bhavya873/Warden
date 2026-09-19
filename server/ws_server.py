@@ -88,6 +88,8 @@ from http import HTTPStatus
 from pathlib import Path
 
 import websockets
+from websockets.datastructures import Headers
+from websockets.http11 import Response
 
 from core.coordinator import CAPACITY_MULTIPLIER, Coordinator, WardenCoordinator
 from sim.simulator import Simulator
@@ -99,20 +101,23 @@ TICK_INTERVAL_SECONDS = 0.1
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
 
-async def serve_static(path, request_headers):
+async def serve_static(connection, request):
     """Answers plain HTTP GETs (the browser loading the page/assets) with files from
     web/, so the same Railway service serves both the dashboard and its WS stream.
     Returns None for genuine WebSocket upgrade requests, which lets websockets.serve
-    proceed with the handshake as usual."""
-    if request_headers.get("Upgrade", "").lower() == "websocket":
+    proceed with the handshake as usual. Signature is (connection, request) per
+    websockets>=13's asyncio server implementation, which is what `websockets.serve`
+    resolves to as of the version pinned here -- not the legacy (path, headers) hook."""
+    if request.headers.get("Upgrade", "").lower() == "websocket":
         return None
-    file_path = path.split("?", 1)[0].lstrip("/") or "index.html"
+    file_path = request.path.split("?", 1)[0].lstrip("/") or "index.html"
     target = (WEB_DIR / file_path).resolve()
     if WEB_DIR not in target.parents or not target.is_file():
-        return HTTPStatus.NOT_FOUND, [], b"Not found"
+        return connection.respond(HTTPStatus.NOT_FOUND, "Not found\n")
     content_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
     body = target.read_bytes()
-    return HTTPStatus.OK, [("Content-Type", content_type)], body
+    headers = Headers([("Content-Type", content_type), ("Content-Length", str(len(body)))])
+    return Response(HTTPStatus.OK.value, HTTPStatus.OK.phrase, headers, body)
 
 MIN_ROBOT_COUNT = 1
 MAX_ROBOT_COUNT = 1000

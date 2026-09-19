@@ -112,11 +112,6 @@
 
   <section class="dashboard">
     <div class="panel">
-      <div class="compare-legend">
-        <span class="compare-legend-item"><span class="dot dot-naive"></span>Baseline</span>
-        <span class="compare-legend-item"><span class="dot dot-warden"></span>Warden</span>
-      </div>
-
       <div
         class="hero-stat"
         title="Share of moves that needed a network round trip to the server, Baseline vs. Warden, compared directly — this is the headline number the rest of the project is demonstrating"
@@ -124,7 +119,9 @@
         <div class="hero-stat-number mono" id="cmp-reduction-pct">—</div>
         <div class="hero-stat-label">
           <span id="cmp-reduction-word">fewer</span> requests reach the server<br />
-          <span class="hero-stat-sub">Warden vs. Baseline</span>
+          <span class="hero-stat-sub"
+            ><span class="dot dot-warden"></span>Warden vs. <span class="dot dot-naive"></span>Baseline</span
+          >
         </div>
       </div>
 

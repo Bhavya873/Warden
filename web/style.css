@@ -511,26 +511,13 @@ input[type="range"]:focus-visible {
   color: var(--muted-foreground);
 }
 
-/* Sits above .hero-stat (and its dividing line below), naming the two columns the
-   table further down shares — not tied to the table markup itself, since the
-   hero-stat sits between them either way. */
-.compare-legend {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 16px;
-  font-size: 0.75rem;
-  color: var(--muted-foreground);
-}
-
-.compare-legend-item {
-  width: 140px; /* matches .compare td's width, so these line up with its columns */
-  text-align: right;
-  padding: 0 8px;
-}
-
-.compare-legend .dot {
-  margin-right: 5px;
+.hero-stat-sub .dot {
+  margin-right: 4px;
   vertical-align: middle;
+}
+
+.hero-stat-sub .dot-naive {
+  margin-left: 6px;
 }
 
 .compare {

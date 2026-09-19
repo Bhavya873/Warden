@@ -19,7 +19,8 @@ valid server capability for any other client:
      "robots": [{"id": int, "x": int, "y": int, "dx": int, "dy": int, "near_miss": bool,
                  "outcome": "moved" | "waiting" | "conflict" | "idle"}, ...],
      "stats": {"instant_moves": int, "confirmed_checks": int, "conflicts_avoided": int,
-               "near_misses": int, "queue_depth": int, "near_miss_count_total": int},
+               "near_misses": int, "queue_depth": int, "near_miss_count_total": int,
+               "step_seconds": float},
      "totals": {"instant_moves": int, "confirmed_checks": int, "conflicts_avoided": int,
                 "near_misses": int}}
      (instant_moves is always 0 in naive mode — every move is a confirmed check there,
@@ -32,7 +33,12 @@ valid server capability for any other client:
      check), red="conflict" (a confirm-check just resolved "claimed" for this robot),
      and "idle" (default/neutral) for a robot sitting at its current target. `outcome`
      is a snapshot of this one tick, not an animation — it doesn't try to represent a
-     multi-tick "ping traveling" state beyond "currently waiting".)
+     multi-tick "ping traveling" state beyond "currently waiting". `step_seconds` is the
+     wall-clock time this tick's own `sim.step()` call took, measured directly with
+     `time.perf_counter()` — 0.0 right after a reset(), before anything's been stepped.
+     In split mode the client turns each board's value into a live share of the two
+     boards' combined time; in single mode there's only one board, so the raw number is
+     what it is — a real per-tick cost, not a comparison.)
 
 Split mode — two independent worlds, same seed, run in lockstep, each mirroring the
 single-mode "board" shape above (tick/robot_count/robots/stats/totals) under its label:
@@ -74,6 +80,7 @@ collisions, ever, by construction — not a coincidence of this demo's random se
 import asyncio
 import json
 import random
+import time
 
 import websockets
 
@@ -262,7 +269,9 @@ class SimulationServer:
             while len(world.robots) > count:
                 world.remove_robot()
 
-    def _serialize_board(self, sim: Simulator, board_mode: str, before: dict, totals: dict) -> dict:
+    def _serialize_board(
+        self, sim: Simulator, board_mode: str, before: dict, totals: dict, step_seconds: float = 0.0
+    ) -> dict:
         world = sim.world
         near_miss_ids = set(world.near_miss_robot_ids)
         claimed_ids = set(sim.coordinator.claimed_robot_ids_this_tick) if sim.coordinator is not None else set()
@@ -312,6 +321,13 @@ class SimulationServer:
                 stats["queue_depth"] = sim.coordinator.confirm_check_log[-1]["queue_depth"]
         stats["near_misses"] = len(near_miss_ids)
         stats["near_miss_count_total"] = world.near_miss_count
+        # Wall-clock time this board's own sim.step() took this tick, measured directly
+        # (time.perf_counter() around the call in _step_and_serialize_split) — not
+        # attributed/isolated the way tasks/benchmark-findings.md's offline CPU-share
+        # figure was. The client turns this into a live share (own / (own + other's)),
+        # which is honest for what it is: a direct comparison of the two boards' actual
+        # per-tick compute cost, not a host-level CPU utilization percentage.
+        stats["step_seconds"] = step_seconds
 
         totals["instant_moves"] += stats["instant_moves"]
         totals["confirmed_checks"] += stats["confirmed_checks"]
@@ -333,14 +349,17 @@ class SimulationServer:
 
     def _step_and_serialize_single(self) -> dict:
         before = self.sim.world.robot_positions()
+        start = time.perf_counter()
         self.sim.step()
-        return self._snapshot_single(before)
+        step_seconds = time.perf_counter() - start
+        return self._snapshot_single(before, step_seconds)
 
-    def _snapshot_single(self, before: dict) -> dict:
+    def _snapshot_single(self, before: dict, step_seconds: float = 0.0) -> dict:
         """Serializes `self.sim`'s current state against `before` — the caller decides
         whether that's a pre-step snapshot (normal ticking) or the same-as-current
-        positions (a `reset()` refresh, where nothing has moved yet so dx/dy is 0)."""
-        board = self._serialize_board(self.sim, self.mode, before, self.totals)
+        positions (a `reset()` refresh, where nothing has moved yet so dx/dy is 0,
+        step_seconds 0.0 too — nothing was actually stepped)."""
+        board = self._serialize_board(self.sim, self.mode, before, self.totals, step_seconds)
         return {
             "type": "tick",
             "grid_size": self.grid_size,
@@ -352,13 +371,20 @@ class SimulationServer:
 
     def _step_and_serialize_split(self) -> dict:
         befores = {label: sim.world.robot_positions() for label, sim in self.split_sims.items()}
-        for sim in self.split_sims.values():
+        step_seconds: dict[str, float] = {}
+        for label, sim in self.split_sims.items():
+            start = time.perf_counter()
             sim.step()
-        return self._snapshot_split(befores)
+            step_seconds[label] = time.perf_counter() - start
+        return self._snapshot_split(befores, step_seconds)
 
-    def _snapshot_split(self, befores: dict[str, dict]) -> dict:
+    def _snapshot_split(self, befores: dict[str, dict], step_seconds: dict[str, float] | None = None) -> dict:
+        # None (a reset()/pre-first-tick snapshot) means nothing has been timed yet.
+        seconds = step_seconds or {}
         boards = {
-            label: self._serialize_board(sim, label, befores[label], self.split_totals[label])
+            label: self._serialize_board(
+                sim, label, befores[label], self.split_totals[label], seconds.get(label, 0.0)
+            )
             for label, sim in self.split_sims.items()
         }
         return {

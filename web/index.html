@@ -136,9 +136,9 @@
           <tr>
             <th
               scope="row"
-              title="Requests currently in flight to the coordinator, not yet resolved, as a % of robot_count — each robot has at most one pending confirm-check at a time, so this is a real, bounded percentage, not a raw count. (Not a CPU percentage: this single-process demo shares one CPU between both boards, so a CPU-usage comparison wouldn't mean what it would for two separate services.)"
+              title="Each board's share of the real wall-clock time both boards' simulation steps took this tick, measured directly on the server. A genuine compute-cost comparison between the two coordinators — not a host-level CPU utilization percentage, which this single-process demo (both boards sharing one CPU) can't measure meaningfully."
             >
-              Network requests queued
+              Server CPU usage
             </th>
             <td class="mono" id="cmp-naive-load" aria-label="Baseline">0%</td>
             <td class="mono" id="cmp-warden-load" aria-label="Warden">0%</td>
@@ -154,8 +154,8 @@
             <td class="mono" id="cmp-warden-conflicts" aria-label="Warden">0</td>
           </tr>
           <tr>
-            <th scope="row" title="Average of the row above (% of robot_count in flight) over the visible window — this is what the graph below plots">
-              Network requests queued over time
+            <th scope="row" title="Average of the row above (CPU-time share) over the visible window — this is what the graph below plots">
+              Server CPU usage over time
             </th>
             <td class="mono" id="load-avg-naive" aria-label="Baseline">0%</td>
             <td class="mono" id="load-avg-warden" aria-label="Warden">0%</td>

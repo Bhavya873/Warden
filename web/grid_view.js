@@ -65,7 +65,7 @@ const reductionWordEl = document.getElementById("cmp-reduction-word");
 
 let socket = null;
 
-// --- Chart: a single, unobtrusive server-load sparkline. The comparison table covers
+// --- Chart: a single, unobtrusive CPU-usage sparkline. The comparison table covers
 // the point-in-time numbers; this is the only place trend-over-time earns a chart. No
 // title, legend, or axis labels — those would just repeat what the table already says. --
 
@@ -125,13 +125,17 @@ function average(values) {
   return values.length > 0 ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
 }
 
-// Network requests queued, as a % of robot_count: each robot has at most one pending
-// confirm-check at a time, so this is bounded [0, 100] -- a real percentage, not a raw
-// count with no natural ceiling. That fixed ceiling is also why the chart's y-axis can
-// just be a flat 0-100 (see loadChart's scales.y above) instead of needing the
-// EMA-smoothed dynamic max a raw, unbounded count would have required.
-function queuePct(board) {
-  return board.robot_count > 0 ? (board.stats.queue_depth / board.robot_count) * 100 : 0;
+// Server CPU usage, as a live share between the two boards: stats.step_seconds is the
+// real wall-clock time (time.perf_counter(), measured server-side around each board's
+// own sim.step() call) that tick's step took. Sharing it this way -- own / (own +
+// other's) -- is honest about what it actually is: a direct comparison of the two
+// coordinators' real compute cost, not a host-level CPU-utilization percentage (which
+// this single-process demo can't measure meaningfully -- see tasks/benchmark-
+// findings.md). It's bounded [0, 100] by construction, which is why the chart's y-axis
+// can just be a flat 0-100 instead of an unbounded dynamic max.
+function cpuSharePct(board, other) {
+  const total = board.stats.step_seconds + other.stats.step_seconds;
+  return total > 0 ? (board.stats.step_seconds / total) * 100 : 0;
 }
 
 // --- WebSocket -----------------------------------------------------------
@@ -172,8 +176,8 @@ function render(state) {
   // controls stay responsive), which would otherwise push duplicate points onto the
   // rolling window and make the sparkline visibly scroll even though nothing changed.
   if (!state.paused) {
-    pushRolling(loadChart.data.datasets[0].data, queuePct(naive));
-    pushRolling(loadChart.data.datasets[1].data, queuePct(warden));
+    pushRolling(loadChart.data.datasets[0].data, cpuSharePct(naive, warden));
+    pushRolling(loadChart.data.datasets[1].data, cpuSharePct(warden, naive));
     pushRolling(loadChart.data.labels, naive.tick); // both boards are stepped together, one shared timeline
     loadChart.update("none");
     loadAvgNaiveEl.textContent = `${average(loadChart.data.datasets[0].data).toFixed(0)}%`;
@@ -181,8 +185,8 @@ function render(state) {
   }
 
   statTick.textContent = `(tick ${naive.tick})`;
-  updateCompareRow(compareEls.naive, naive);
-  updateCompareRow(compareEls.warden, warden);
+  updateCompareRow(compareEls.naive, naive, warden);
+  updateCompareRow(compareEls.warden, warden, naive);
   updateReductionHero(naive, warden);
 
   syncControls(naive.robot_count, state.grid_size, state.broadcast_lag);
@@ -194,9 +198,9 @@ function render(state) {
   }
 }
 
-function updateCompareRow(els, board) {
+function updateCompareRow(els, board, other) {
   els.moves.textContent = board.totals.instant_moves + board.totals.confirmed_checks;
-  els.load.textContent = `${queuePct(board).toFixed(0)}%`;
+  els.load.textContent = `${cpuSharePct(board, other).toFixed(0)}%`;
   els.conflicts.textContent = board.totals.conflicts_avoided;
 }
 

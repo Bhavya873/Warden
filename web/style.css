@@ -199,6 +199,31 @@ body {
   white-space: nowrap;
 }
 
+.github-link {
+  display: flex;
+  color: var(--muted-foreground);
+}
+
+.github-link:hover {
+  color: var(--foreground);
+}
+
+.site-footer {
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: var(--brutal-border) solid var(--foreground);
+}
+
+.citation {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--muted-foreground);
+}
+
+.citation a {
+  color: var(--primary);
+}
+
 /* The one deliberate motion moment on the page: a live dot pulses (opacity, not a soft
    blurred glow — that would fight the flat/hard aesthetic) while connected, sits flat and
    dim while not. */

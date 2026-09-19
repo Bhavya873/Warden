@@ -23,26 +23,40 @@
       </div>
     </div>
     <p class="abstract">
-      Warden solves a real problem in warehouse robotics. How do you stop robots from running into each
-      other without making every single move check in with a server first? Most of the time nothing is
-      in the way, so most of those checks are wasted overhead.
+      <strong class="abstract-label">What Warden Does:</strong> Warden is a warehouse robotics project
+      that stops robots from moving into the same cell. Normally a robot asks a central server before
+      every move; Warden lets robots answer most of those checks locally, so the server only gets
+      contacted when a conflict is actually possible.
     </p>
     <p class="abstract">
-      Warden gives each robot a small local Ribbon filter that can instantly say that a cell is free with
-      certainty, or that it might be occupied when it is not sure. Only the uncertain cases get sent back
-      to the server, which keeps the real authoritative record in a ring buffer. This is the same trick
-      networks use to catch duplicate packets. Reject the easy cases fast, and only pay for an exact
-      answer when there is genuine ambiguity.
+      <strong class="abstract-label">How It Works:</strong> Each robot keeps a small local Ribbon filter
+      that instantly confirms a cell is free, or flags it as possibly occupied. Only the uncertain cases
+      go to the server, which checks its ring buffer — the authoritative record of currently claimed
+      cells — and makes the final call.
     </p>
     <p class="abstract">
-      The pattern generalizes well beyond robots. Rate limiters, cache lookups, and any deduplication
-      system where most checks come back negative and a wrong negative is rare enough to double check can
-      benefit from the same approach.
+      <strong class="abstract-label">How to Use It:</strong> Run the simulation to compare Warden against
+      a baseline where every check hits the server. The live WebSocket dashboard runs both side by side,
+      showing robot activity, server requests, and response times, so you can see how often Warden skips
+      the server call and what that does to performance.
     </p>
     <p class="abstract">
-      The filter and ring buffer are written in Rust and exposed to Python through PyO3, so the
-      performance critical part stays fast while the simulation logic stays easy to iterate on. A live
-      WebSocket dashboard runs Warden side by side against a baseline that always asks the server, so the impact can be seen in real time.
+      <strong class="abstract-label">Benefits:</strong> With most cells empty most of the time, Warden
+      cuts network traffic and speeds up the common case — robots keep moving without waiting on the
+      server. Safety doesn't depend on the filter: the server still resolves every uncertain case before a
+      robot moves into a cell that might be occupied.
+    </p>
+    <p class="abstract">
+      <strong class="abstract-label">Tradeoffs:</strong> A false positive — the filter flagging a free
+      cell as maybe-occupied — costs an extra server request, shrinking the win. Warden also assumes
+      occupancy doesn't change too fast: the busier the warehouse, the more filter refreshes and server
+      checks it needs.
+    </p>
+    <p class="abstract">
+      <strong class="abstract-label">How It Was Built:</strong> The Ribbon filter and ring buffer are
+      written in Rust for speed; the simulation is Python, so robot behavior and warehouse conditions stay
+      easy to iterate on. PyO3 bridges the two, and a WebSocket dashboard shows Warden and the baseline
+      running side by side in real time.
     </p>
   </header>
 

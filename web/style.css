@@ -182,6 +182,14 @@ body {
   line-height: 1.55;
 }
 
+/* Each abstract paragraph's leading "What Warden Does:"-style label -- full-brightness
+   foreground against the paragraph's muted body text, inline at the start rather than
+   its own heading line, so the section still reads as one flowing paragraph. */
+.abstract-label {
+  color: var(--foreground);
+  font-weight: 700;
+}
+
 .header-status {
   font-size: 0.85rem;
   color: var(--muted-foreground);

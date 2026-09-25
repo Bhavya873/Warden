@@ -1,5 +1,7 @@
 # Warden 🤖
 
+[Demo](https://warden-warehouse-robots.up.railway.app/)
+
 Warden is a warehouse-robot coordination demo that reduces unnecessary server checks during collision avoidance.
 
 It compares two approaches:
